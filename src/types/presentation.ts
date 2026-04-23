@@ -20,6 +20,7 @@ export interface NormalizedTheme {
 export interface SlideBackground {
   color?: string
   imageUrl?: string
+  css?: string
 }
 
 export interface SlideTransitionMeta {
@@ -27,12 +28,21 @@ export interface SlideTransitionMeta {
   durationMs: number
 }
 
+export interface SlideAutoplay {
+  advanceOnClick: boolean
+  advanceAfterMs?: number
+}
+
+export type MediaCleanupPolicy = 'keep' | 'revoke-object-url'
+
 export interface MediaResource {
   src?: string
-  blob?: Blob
+  objectUrl?: string
+  blob?: Blob | string
   mimeType?: string
   poster?: string
   preload?: 'auto' | 'metadata' | 'none'
+  cleanup?: MediaCleanupPolicy
 }
 
 export interface NormalizedElementBounds {
@@ -43,15 +53,43 @@ export interface NormalizedElementBounds {
   rotate: number
 }
 
+export interface NormalizedShapeMeta {
+  path?: string
+  type?: string
+  viewBoxWidth?: number
+  viewBoxHeight?: number
+  lineHeadEnd?: LineEndMarker
+  lineTailEnd?: LineEndMarker
+  vAlign?: 'up' | 'mid' | 'down' | string
+  isVertical?: boolean
+  isFlipH?: boolean
+  isFlipV?: boolean
+  textInset?: {
+    left: number
+    right: number
+    top: number
+    bottom: number
+  }
+}
+
+export interface LineEndMarker {
+  type?: string
+  width?: string
+  length?: string
+}
+
 export interface NormalizedElement {
   id: string
   type: NormalizedElementType
   name: string
+  order: number
   bounds: NormalizedElementBounds
   text?: string
   html?: string
   style: Record<string, string>
   media?: MediaResource
+  shape?: NormalizedShapeMeta
+  children?: NormalizedElement[]
   raw: unknown
 }
 
@@ -60,6 +98,7 @@ export interface NormalizedAnimation {
   trigger: 'withPrevious' | 'afterPrevious' | 'onClick'
   durationMs: number
   targetElementIds: string[]
+  effect: 'appear' | 'fade'
 }
 
 export interface NormalizedSlide {
@@ -68,10 +107,7 @@ export interface NormalizedSlide {
   note?: string
   background: SlideBackground
   transition?: SlideTransitionMeta
-  autoplay: {
-    advanceOnClick: boolean
-    advanceAfterMs?: number
-  }
+  autoplay: SlideAutoplay
   elements: NormalizedElement[]
   animations: NormalizedAnimation[]
 }
@@ -88,9 +124,12 @@ export interface PresentationRuntimeState {
   sessionStatus: SessionStatus
   activeSlideIndex: number
   timelinePositionMs: number
+  slideElapsedMs: number
   currentTriggerIndex: number
   waitingTrigger: boolean
   transitionProgress: number
+  transitionFromSlideIndex: number | null
+  transitionToSlideIndex: number | null
   isFullscreen: boolean
   isMuted: boolean
   presenterMode: boolean
@@ -100,7 +139,9 @@ export interface PresentationRuntimeState {
 
 export interface EvaluatedElementFrame {
   id: string
+  name: string
   type: NormalizedElementType
+  order: number
   visible: boolean
   opacity: number
   transform: string
@@ -109,10 +150,13 @@ export interface EvaluatedElementFrame {
   html?: string
   media?: MediaResource
   bounds: NormalizedElementBounds
+  shape?: NormalizedShapeMeta
+  children?: EvaluatedElementFrame[]
 }
 
 export interface EvaluatedSlideFrame {
   slideId: string
+  slideName: string
   background: SlideBackground
   elements: EvaluatedElementFrame[]
 }
@@ -121,6 +165,8 @@ export interface PresentationFrame {
   width: number
   height: number
   currentSlideIndex: number
+  isTransitioning: boolean
+  transitionProgress: number
   current?: EvaluatedSlideFrame
   previous?: EvaluatedSlideFrame
   next?: EvaluatedSlideFrame
