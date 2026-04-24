@@ -127,3 +127,16 @@ PPTX File
 ```text
 pptxtojson-runtime-architecture.md
 ```
+
+差距分析与实施路线图见：
+
+```text
+pptxtojson-runtime-gap-analysis.md
+```
+
+Fixture 清单与知识库见：
+
+```text
+fixtures/
+knowledge-base/
+```
