@@ -1,10 +1,21 @@
-# pptxtojson Runtime 架构落地差距分析
+# pptxtojson Runtime 架构落地差距分析（按当前代码状态更新）
 
-本文档基于 `pptxtojson-runtime-architecture.md`，对当前 `ppt-preview` 项目的代码还原程度进行对照梳理，用于记录已经完成的能力、部分落地的能力、尚未实现的架构模块，以及后续建议优先级。
+本文档基于 [pptxtojson-runtime-architecture.md](./pptxtojson-runtime-architecture.md)，结合当前 `ppt-preview` 仓库代码，对“已经完成、部分完成、仍未完成”的能力做一次按现状更新的梳理。
+
+结论先行：
+
+- 当前项目已经不是“只有 demo 级骨架”，主链路和一批高保真补丁已经落地。
+- 当前最大差距不在上传/解析/基础播放，而在：
+  - Runtime engine 还没有拆分
+  - Timeline / Transition / Media 还没有形成独立系统
+  - table / chart / diagram 等复杂元素仍未渲染
+  - 测试、fixture、视觉回归体系仍然缺失
+
+---
 
 ## 1. 当前总体结论
 
-当前项目已经完成了从 PPTX 文件到 Web 预览的基础闭环：
+当前项目已经具备下面这条可运行主链路：
 
 ```text
 PPTX File
@@ -12,141 +23,142 @@ PPTX File
   -> normalizePresentation()
   -> createPresentationRuntime()
   -> evaluatePresentationFrame()
-  -> Vue Components Render
+  -> Vue Render Components
 ```
 
-也就是说，项目已经具备“可运行 PPT 预览器骨架”。
+也就是说：
 
-但对照架构文档中的目标，当前实现还没有达到“商业级 PPT 播放 Runtime”的完整形态。主要差距集中在：
+- 解析输入层已经切到 `pptxtojson`
+- 已经有标准化模型层
+- 已经有基础 Runtime facade
+- 已经有 Evaluator
+- 已经有 Vue 渲染层
 
-- Runtime 还没有拆成独立 engine。
-- Timeline 只支持基础动画。
-- Transition 只有简单过渡表现。
-- Media Engine 还没有生命周期调度。
-- Input、Overlay、Annotation、Laser Pointer 等演示能力尚未建立。
-- 文本、形状、表格、图表、SmartArt 等高保真还原仍需要持续补齐。
-- 缺少测试、fixture 和视觉回归体系。
+但对照架构文档，当前实现还没有达到“完整商业级 PPT Runtime”的目标。它现在更接近：
 
-## 2. 已经做到的部分
+> 一个已经能持续修 PPT 还原问题的播放内核雏形，而不是完整模块化、可验证、可扩展的播放平台。
+
+---
+
+## 2. 已经完成的部分
 
 ### 2.1 解析与标准化主链路
 
-当前项目已经接入 `pptxtojson`，并通过适配层将原始 JSON 转成播放器内部模型。
+当前项目已经完成 `pptxtojson -> normalize -> runtime` 这条主链路。
 
 相关文件：
 
-- `src/adapters/pptxtojson/parseWithPptxtojson.ts`
-- `src/adapters/pptxtojson/normalizePresentation.ts`
-- `src/types/presentation.ts`
+- [src/adapters/pptxtojson/parseWithPptxtojson.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/parseWithPptxtojson.ts)
+- [src/adapters/pptxtojson/normalizePresentation.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/normalizePresentation.ts)
+- [src/types/presentation.ts](/Applications/work/ppt-preview/src/types/presentation.ts)
 
-已经覆盖的标准化内容包括：
+当前标准化模型已经覆盖：
 
-- 页面尺寸
-- 页面背景
-- 页面备注
-- 页面切换元数据
-- 自动翻页策略
-- 元素坐标与尺寸
-- 元素类型
-- 媒体资源
-- 基础动画描述
-- 主题色与字体列表
+- presentation 尺寸、主题色、字体
+- slide 背景、备注、transition、autoplay
+- element 坐标、尺寸、旋转、样式
+- image / video / audio / math 媒体
+- shape 元信息
+- 基础 animation 元数据
 
-### 2.2 基础 Runtime
+### 2.2 基础 Runtime facade
 
-当前已经有 `createPresentationRuntime()` 作为播放 facade。
+当前已经有统一播放入口 [createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts)。
 
 已支持：
 
-- 播放
-- 暂停
-- 下一页
-- 上一页
-- 下一步
-- 上一步
-- 跳转到指定页
+- 播放 / 暂停
+- 下一步 / 上一步
+- 下一页 / 上一页
+- 跳页
 - seek
-- 静音状态
+- 静音
 - 全屏状态
 - 演讲者模式状态
 - 循环播放
-- 播放倍速
+- 倍速
 - `requestAnimationFrame` 驱动的 `tick`
 
-相关文件：
+### 2.3 基础 Evaluator
 
-- `src/runtime/createPresentationRuntime.ts`
-- `src/composables/presentation/usePresentationPlayer.ts`
+[evaluatePresentationFrame.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.ts) 已经可以根据 runtime state 输出 frame。
 
-### 2.3 Render Evaluation Layer 基础实现
-
-当前已经有 `evaluatePresentationFrame()`，可以根据 runtime state 输出渲染帧。
-
-已输出：
+当前已输出：
 
 - 当前页
 - 上一页
 - 下一页
 - transition progress
-- 元素 visible
-- 元素 opacity
-- 元素 transform
-- 元素 style
-- 元素 bounds
-- 元素 media
-- 元素 shape meta
+- element visible
+- element opacity
+- element transform
+- element style
+- element bounds
+- element media
+- element shape
 
-相关文件：
+### 2.4 Vue 播放器渲染层
 
-- `src/runtime/evaluatePresentationFrame.ts`
+当前已经具备基础播放器 UI 和页面渲染。
 
-### 2.4 Vue 渲染层基础组件
+相关组件：
 
-当前已经具备基础播放器 UI。
+- [src/components/presentation/PresentationShell.vue](/Applications/work/ppt-preview/src/components/presentation/PresentationShell.vue)
+- [src/components/presentation/PresentationStage.vue](/Applications/work/ppt-preview/src/components/presentation/PresentationStage.vue)
+- [src/components/presentation/SlideViewport.vue](/Applications/work/ppt-preview/src/components/presentation/SlideViewport.vue)
+- [src/components/presentation/ElementRenderer.vue](/Applications/work/ppt-preview/src/components/presentation/ElementRenderer.vue)
+- [src/components/presentation/PlaybackToolbar.vue](/Applications/work/ppt-preview/src/components/presentation/PlaybackToolbar.vue)
+- [src/components/presentation/PresenterPanel.vue](/Applications/work/ppt-preview/src/components/presentation/PresenterPanel.vue)
 
-已有组件：
+当前实际可渲染的元素包括：
 
-- `PresentationShell.vue`
-- `PresentationStage.vue`
-- `SlideViewport.vue`
-- `ElementRenderer.vue`
-- `PlaybackToolbar.vue`
-- `PresenterPanel.vue`
+- `text`
+- `image`
+- `shape`
+- `video`
+- `audio`
+- `math`
+- `group`
 
-当前 `ElementRenderer.vue` 已经支持基础元素渲染：
+### 2.5 XML 增强层已经明显强于旧分析
 
-- text
-- image
-- shape
-- video
-- audio
-- math
-- group
+旧 gap 文档里把这部分描述得偏保守。实际上，[textBodyInsets.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/textBodyInsets.ts) 现在已经承担了一批高保真增强职责：
 
-### 2.5 部分 PPT 高保真补丁
+- 读取 `a:bodyPr` 的 text inset
+- 读取自定义 bullet 字符与 bullet font
+- 读取 `headEnd / tailEnd`
+- 读取 placeholder `type / idx`
+- 修正“扩展名是 png，文件内容其实是 svg”的媒体 MIME
 
-当前代码已经针对具体 PPT 还原问题补了一些增强能力：
+这意味着解析层已经不仅是“补 inset”，而是在逐步承担 parser enhancer 的角色。
 
-- PPT XML 中 `a:bodyPr` 的 text body inset 读取。
-- 自定义 bullet 字符读取，例如 `√` 项目符号。
-- 线条箭头 `headEnd` / `tailEnd` 读取。
-- shape path 的 SVG 渲染。
-- dashed border 映射为 SVG stroke dasharray。
-- 空白 list item 过滤。
-- 图片内部辅助虚线框过滤。
-- 文本短行不强制换行的基础处理。
+### 2.6 高保真渲染补丁已经落地一批
 
-相关文件：
+[normalizePresentation.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/normalizePresentation.ts) 和 [ElementRenderer.vue](/Applications/work/ppt-preview/src/components/presentation/ElementRenderer.vue) 里，已经补了不少旧文档里还没更新进去的能力：
 
-- `src/adapters/pptxtojson/textBodyInsets.ts`
-- `src/adapters/pptxtojson/normalizePresentation.ts`
-- `src/components/presentation/ElementRenderer.vue`
+- 图片裁剪 `srcRect`
+- 重复文本颜色统一
+- placeholder 主题色兜底
+- math 媒体资源兜底
+- text inset 作为 `padding` 参与布局
+- `NBSP / 窄不换行空格` 标准化
+- bullet 空白项过滤
+- 短文本单行显示启发式
+- 字号从 HTML run 里回读
+- 居中标题不误压成单行
+- `rect / roundRect` 走 CSS 盒子渲染而不是 SVG path
+- shape 背景层与文本层拆开
+- media crop 的 CSS 渲染
 
-## 3. 部分做到但还不完整的部分
+换句话说，当前项目已经开始形成“解析增强 + 归一化兜底 + 渲染层修正”的三层补丁体系。
 
-### 3.1 Runtime 模块拆分不足
+---
 
-架构文档建议 Runtime 拆为：
+## 3. 部分完成但还不完整的部分
+
+### 3.1 Runtime 还没有拆成独立 engine
+
+架构文档目标是：
 
 ```text
 Presentation Runtime Facade
@@ -158,22 +170,27 @@ Presentation Runtime Facade
 └─ Input Engine
 ```
 
-当前这些能力大多集中在 `src/runtime/createPresentationRuntime.ts` 一个文件里。
+当前这些能力仍然主要集中在 [createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts) 一个文件里。
 
-目前的问题：
+已经有的只是：
 
-- Session Store 没有单独模块。
-- Timeline Engine 没有单独模块。
-- Transition Engine 没有单独模块。
-- Media Engine 没有单独模块。
-- Playback Policy Engine 没有单独模块。
-- Input Engine 尚未实现。
+- facade
+- 一份集中式 runtime state
+- 基础 tick
+- 基础 slide/trigger/transition 处理
 
-这会导致后续继续补动画、媒体、输入、转场时，`createPresentationRuntime.ts` 容易变成大型状态机文件。
+还没有真正拆出：
 
-### 3.2 Timeline Engine 只支持基础动画
+- Session Store
+- Timeline Engine
+- Transition Engine
+- Media Engine
+- Playback Policy Engine
+- Input Engine
 
-当前动画能力主要是：
+### 3.2 Timeline 只有基础时序
+
+当前 `NormalizedAnimation` 与 evaluator 只支持：
 
 - `appear`
 - `fade`
@@ -181,97 +198,77 @@ Presentation Runtime Facade
 - `withPrevious`
 - `afterPrevious`
 
-还缺少：
+仍然缺少：
 
-- 进入动画细分效果。
-- 退出动画。
-- 强调动画。
-- 路径动画。
-- 组合动画。
-- 动画延迟。
-- 动画缓动。
-- 动画重复。
-- 按段落触发。
-- trigger group。
-- 更完整的 PPT XML 动画解析。
+- entrance 动画细分效果
+- exit 动画
+- emphasis 动画
+- motion path
+- trigger group
+- 段落级触发
+- delay / easing / repeat
+- 更完整的动画时间线建模
 
-当前更像是“基础可见性/透明度控制”，还不是完整 PPT Timeline Runtime。
+所以当前更像是“基础可见性/透明度调度”，不是完整 PPT timeline runtime。
 
-### 3.3 Transition Engine 只有简化表现
+### 3.3 Transition 只有简化过渡
 
-当前 runtime 有 `transitionProgress`，`SlideViewport.vue` 也有上一页和当前页的基础 opacity / transform 过渡。
+当前系统有：
 
-但架构文档中要求的转场还没有完整实现：
+- transition 元数据
+- transition progress
+- `SlideViewport.vue` 中基础 opacity / transform 过渡
+
+但仍然没有按 `transition.type` 派发真实转场 renderer。
+
+仍未形成独立的 Transition Engine，也还没有系统支持：
 
 - fade
 - push
 - cover
 - uncover
-- zoom
 - wipe
 - split
-- morph 类效果
+- zoom
 
-当前还没有根据 `transition.type` 分发不同转场 renderer。
+### 3.4 Media 还没有生命周期调度
 
-### 3.4 Media Engine 只有资源生成与释放
+当前媒体层已经有：
 
-当前媒体处理已经包括：
+- object URL 生成
+- 释放旧 presentation 的 object URL
+- image / video / audio / math 的基础渲染
+- MIME 修正和部分资源兜底
 
-- Blob 转 object URL。
-- video / audio / image / math 基础渲染。
-- 旧 presentation 卸载时 revoke object URL。
+但还没有形成架构文档要求的 Media Engine。
 
-但还缺少商业播放场景需要的 Media Engine：
+仍然缺少：
 
-- 媒体资源注册表。
-- 当前页与下一页预加载。
-- 上一页/远离页资源释放策略。
-- video/audio 跟随 runtime play/pause。
-- video/audio 跟随 seek。
-- mute 状态同步到实际 media element。
-- 媒体加载失败 fallback。
-- 大媒体懒加载。
-- poster 和首帧策略。
+- 媒体注册表
+- preload current / next
+- release far slides
+- video/audio 与 runtime play/pause 同步
+- video/audio seek / mute 同步
+- 媒体加载失败 fallback
+- poster / 首帧策略
+- 大媒体懒加载
 
-### 3.5 Evaluator 输出还不完整
+### 3.5 Evaluator 还只是基础 frame evaluator
 
-架构文档建议 Evaluator 输出：
+当前 Evaluator 已经够基础播放使用，但还没有扩展成完整 frame 计算层。
 
-- `visible`
-- `opacity`
-- `transform`
-- `clipPath`
-- `style`
-- media frame
-- overlay state
-
-当前已经有 `visible / opacity / transform / style`，但还缺少：
+仍然缺少：
 
 - `clipPath`
-- 精细 transform 插值
-- animation progress
-- transition typed frame
+- 精细 animation progress frame
+- typed transition frame
 - media playback frame
 - overlay frame
 - pointer / annotation frame
 
-### 3.6 Vue 渲染层组件还不完整
+### 3.6 Presenter Mode 仍然只是基础面板
 
-架构文档建议的组件中，当前缺少：
-
-- `TransitionStage.vue`
-- `MediaRenderer.vue`
-- `TimelineScrubber.vue`
-- `overlays/FullscreenOverlay.vue`
-- `overlays/LaserPointerLayer.vue`
-- `overlays/AnnotationLayer.vue`
-
-目前媒体、形状、文本等都集中在 `ElementRenderer.vue` 内部，继续补下去会让该组件越来越复杂。
-
-### 3.7 演讲者模式还只是基础面板
-
-当前 `PresenterPanel.vue` 已经能显示：
+当前 [PresenterPanel.vue](/Applications/work/ppt-preview/src/components/presentation/PresenterPanel.vue) 已经能显示：
 
 - 当前页名称
 - 当前页备注
@@ -283,32 +280,33 @@ Presentation Runtime Facade
 
 但还不是完整演讲者模式。
 
-还缺少：
+仍然缺：
 
-- 当前页 / 下一页双预览。
-- 演讲计时器。
-- 备注字号控制。
-- 快捷翻页控制。
-- 演讲者窗口与观众窗口分离。
-- 演讲者模式专用布局。
+- 当前页 / 下一页双预览
+- 演讲计时器
+- 备注字号控制
+- 专用快捷操作
+- 演讲者视图和观众视图分离
 
-## 4. 尚未做到的部分
+---
+
+## 4. 仍然没做的部分
 
 ### 4.1 Input Engine
 
 当前没有独立输入系统。
 
-还缺少：
+仍然缺少：
 
-- 键盘快捷键。
-- 空格播放/暂停或下一步。
-- 左右方向键翻页。
-- 触摸滑动。
-- 鼠标点击舞台推进。
-- 全屏快捷控制。
-- 演讲者模式快捷控制。
+- 键盘快捷键体系
+- 空格播放/暂停或下一步
+- 左右方向键翻页
+- 触摸滑动
+- 点击舞台推进
+- 全屏快捷控制
+- Presenter 模式快捷控制
 
-### 4.2 完整表格、图表、SmartArt 渲染
+### 4.2 复杂元素 renderer
 
 类型层已经声明了：
 
@@ -316,79 +314,95 @@ Presentation Runtime Facade
 - `chart`
 - `diagram`
 
-但当前渲染层还没有完整 renderer。
+但当前真正渲染层并没有完整 renderer。
 
-还缺少：
+这意味着：
 
-- 表格边框、单元格背景、合并单元格、文本样式。
-- 图表转换为 SVG / Canvas / HTML。
-- SmartArt 结构化布局。
-- diagram 子节点高保真还原。
+- table 还没做
+- chart 还没做
+- diagram / SmartArt 类还没做
 
-### 4.3 字体与文本布局系统
+当前系统对复杂 PPT 的兼容瓶颈，已经明显落到这里。
 
-当前文本依赖浏览器 HTML/CSS 渲染，已经修复了一些具体问题，但距离 WPS/PowerPoint 还原还有差距。
+### 4.3 渲染层专用组件体系
 
-还缺少：
+架构文档里建议的组件中，当前还缺：
 
-- 字体加载策略。
-- 缺失字体 fallback 策略。
-- PPT 段落 spacing。
-- bullet indent / hanging indent。
-- rich text run 级样式精确映射。
-- CJK 换行策略。
-- vertical text 精细处理。
-- 文本框 autofit / shrink text。
-- text body margin/inset 更系统的解析与测试。
+- `TransitionStage.vue`
+- `MediaRenderer.vue`
+- `TimelineScrubber.vue`
+- `overlays/FullscreenOverlay.vue`
+- `overlays/LaserPointerLayer.vue`
+- `overlays/AnnotationLayer.vue`
 
-### 4.4 大文件性能策略
+目前媒体、文本、形状等都继续堆在 [ElementRenderer.vue](/Applications/work/ppt-preview/src/components/presentation/ElementRenderer.vue) 中，后续复杂度会继续上升。
 
-架构文档提到的大文件策略尚未完整落地。
+### 4.4 文本布局系统的系统化能力
 
-还缺少：
+虽然这部分已经修了很多具体问题，但系统化能力仍然不足。
 
-- slide runtime cache。
-- 关键页索引预计算。
-- Worker 解析。
-- 分页懒 normalize。
-- 图片 decode 预热。
-- 媒体缓存窗口。
+仍然缺少：
 
-### 4.5 测试与回归体系
+- 字体加载策略
+- 缺失字体 fallback 策略
+- 段落 spacing 精准映射
+- bullet indent / hanging indent 系统化解析
+- rich text run 级样式完整映射
+- CJK 换行策略
+- vertical text 的系统化处理
+- autofit / shrink text
+- 系统化的文本布局测试
 
-当前仓库没有成体系的测试文件。
+### 4.5 性能层与大文件策略
 
-还缺少：
+架构文档提到的大文件策略，当前基本还没落地。
 
-- normalize 单元测试。
-- XML 增强 fixture 测试。
-- Runtime 状态机测试。
-- Timeline Engine 测试。
-- Transition Engine 测试。
-- Media Engine 测试。
-- Playwright 截图回归。
-- WPS / PowerPoint 对比基准图。
+仍然缺少：
 
-这部分非常重要，因为当前问题主要来自 PPT 还原细节，没有测试就容易出现“修了这一页，影响另一页”的情况。
+- slide runtime cache
+- 关键页索引预计算
+- Worker 解析
+- 分页懒 normalize
+- 图片 decode 预热
+- 媒体缓存窗口
 
-## 5. 当前实现与架构文档的阶段对应
+### 4.6 测试与视觉回归体系
+
+这部分仍然是当前项目最明显的工程短板之一。
+
+仍然缺少：
+
+- normalize 单元测试
+- XML 增强 fixture 测试
+- runtime 状态机测试
+- timeline 测试
+- transition 测试
+- media 测试
+- Playwright 截图回归
+- WPS / PowerPoint 对比基准图
+
+目前大量问题都来自“某个具体 PPT 页面还原不一致”，如果没有 fixture 和视觉回归，修复会持续互相影响。
+
+---
+
+## 5. 当前代码状态与架构文档的阶段对应
 
 ### 阶段 1：替换解析输入层
 
-完成度：较高。
+完成度：高。
 
 已经完成：
 
-- 引入 `pptxtojson`。
-- 新增 `parseWithPptxtojson.ts`。
-- 新增 `normalizePresentation.ts`。
-- 基础渲染器可消费 normalized model。
+- 接入 `pptxtojson`
+- 建立标准化模型
+- 建立 XML enhancer
+- 归一化后直接驱动播放器
 
 仍需补齐：
 
-- parser enhancement 模块拆分。
-- 更多 PPT XML 细节增强。
-- fixture 测试。
+- enhancer 模块继续拆分
+- fixture 测试
+- 更系统的主题/字体/文本布局增强
 
 ### 阶段 2：重构 Runtime
 
@@ -396,20 +410,20 @@ Presentation Runtime Facade
 
 已经完成：
 
-- 有 Runtime facade。
-- 有 session state。
-- 有基础 tick。
-- 有基础 trigger。
-- 有基础 transition progress。
+- 有 runtime facade
+- 有集中 state
+- 有基础 tick
+- 有基础 trigger
+- 有基础 transition progress
 
 仍需补齐：
 
-- Session Store 独立化。
-- Timeline Engine 独立化。
-- Transition Engine 独立化。
-- Media Engine 独立化。
-- Playback Policy Engine 独立化。
-- Input Engine 实现。
+- Session Store 独立化
+- Timeline Engine 独立化
+- Transition Engine 独立化
+- Media Engine 独立化
+- Playback Policy Engine 独立化
+- Input Engine 实现
 
 ### 阶段 3：重构渲染层
 
@@ -417,43 +431,51 @@ Presentation Runtime Facade
 
 已经完成：
 
-- Vue 组件只消费 frame 和 runtime props。
-- 有 `ElementRenderer` 分发基础元素。
-- 有 `SlideViewport` 和 `PresentationStage`。
+- Vue 组件只消费 frame/runtime
+- 有基础 slide viewport
+- 有 element renderer
+- 有 presenter 面板
 
 仍需补齐：
 
-- `TransitionStage`。
-- `MediaRenderer`。
-- table/chart/diagram renderer。
-- overlay layer。
-- annotation / laser pointer。
-- timeline scrubber。
+- `TransitionStage`
+- `MediaRenderer`
+- table/chart/diagram renderer
+- overlay layer
+- annotation / laser pointer
+- timeline scrubber
 
-## 6. 建议后续优先级
+---
 
-### P0：先稳住高保真还原基础设施
+## 6. 当前最核心的未完成项
 
-优先原因：
+如果只挑最影响项目演进的几项，当前最核心还没做的是：
 
-当前用户反馈的问题主要集中在 PPT/WPS 对比还原，例如：
+1. **没有模块化 Runtime engine**
+2. **没有完整 Timeline / Transition / Media 系统**
+3. **没有 table/chart/diagram renderer**
+4. **没有回归测试和视觉基准**
 
-- 文本位置偏移。
-- 文本换行不一致。
-- bullet 符号不一致。
-- 箭头不显示。
-- 虚线框显示错误。
-- 背景缺失。
+这 4 项决定了项目是否能从“持续 patch 某些 PPT”走向“稳定支持一批 PPT 模板”。
+
+---
+
+## 7. 建议的后续优先级
+
+### P0：先补回归能力，而不是继续堆散点修复
 
 建议先做：
 
-- 建立 PPT fixture。
-- 建立 WPS 对比截图。
-- 为 `textBodyInsets.ts` 这类 XML 增强逻辑加测试。
-- 将 XML 增强拆成多个模块。
-- 对文本、形状、线条、图片辅助框建立回归用例。
+- 建立 PPT fixture 集
+- 为 XML enhancer 加 fixture 测试
+- 为关键页面加截图回归
+- 固定一批 WPS / PowerPoint 对照基准图
 
-### P1：拆 Runtime Engine
+原因：
+
+当前项目最容易出问题的环节，是“某个具体 PPT 页面还原细节”。没有回归体系，修一个页面很容易影响另一个。
+
+### P1：拆 Runtime engine
 
 建议拆分顺序：
 
@@ -461,52 +483,266 @@ Presentation Runtime Facade
 2. Playback Policy Engine
 3. Timeline Engine
 4. Transition Engine
-5. Input Engine
-6. Media Engine
+5. Media Engine
+6. Input Engine
 
-先拆 Session 和 Policy，可以降低当前 `createPresentationRuntime.ts` 的复杂度。
+### P2：补完整 Timeline / Transition / Media
 
-### P2：补完整 Timeline / Transition
+建议优先做：
 
-建议先做：
+- animation progress
+- 更多 animation effect
+- typed transition dispatch
+- media play/pause/seek/mute 同步
 
-- 支持更多 animation effect。
-- 支持动画 delay。
-- 支持 animation progress 输出。
-- 支持按 `transition.type` 分发转场。
-- 新增 `TransitionStage.vue`。
+### P3：补复杂元素 renderer
 
-### P3：补 Media Engine 与大文件策略
+优先顺序建议：
 
-建议做：
-
-- media registry。
-- preload current / next。
-- release far slides。
-- sync play / pause / seek / mute。
-- Worker 解析。
-- slide runtime cache。
+1. table
+2. chart
+3. diagram / SmartArt
 
 ### P4：补演示增强能力
 
 建议做：
 
-- keyboard hotkeys。
-- TimelineScrubber。
-- LaserPointerLayer。
-- AnnotationLayer。
-- FullscreenOverlay。
-- 完整 Presenter Mode。
+- keyboard hotkeys
+- presenter dual view
+- timeline scrubber
+- laser pointer
+- annotation
+- fullscreen overlay
 
-## 7. 当前最值得先处理的问题
+---
 
-从当前项目状态看，最优先的不是继续大拆架构，而是先把“还原一致性”做稳。
+## 8. 一句话判断
 
-建议下一步从这几件事开始：
+当前项目已经具备“继续修高保真问题”的技术底座，但还没有完成架构文档里定义的完整播放平台能力。
 
-1. 把 `textBodyInsets.ts` 拆成更明确的 XML 增强模块。
-2. 增加 fixture 测试，覆盖文本 inset、bullet、line marker、辅助框过滤。
-3. 给当前用户反馈过的 PPT 页面建立截图回归。
-4. 再逐步拆 Runtime engine，避免一边大重构一边继续引入还原偏差。
+如果后续目标是“稳定支持更多真实 PPT 模板”，接下来最该补的不是再加一层零散 patch，而是：
 
-这样可以先保证“看起来对”，再逐步补齐“架构上完整”。
+> 回归体系、Runtime engine 拆分、Timeline/Transition/Media 系统化、复杂元素 renderer。
+
+---
+
+## 9. 实施路线图
+
+下面这份路线图按“先稳住正确性，再拆架构，再补能力”的顺序安排。
+
+### 阶段 A：建立回归基线
+
+目标：
+
+- 让后续改动可验证，避免继续靠人工比对单页问题回归
+
+建议周期：
+
+- 1 周
+
+建议交付物：
+
+- `fixtures/` 目录，收敛当前高频问题 PPT
+- 每个 fixture 的页面清单和问题标签
+- XML enhancer 的最小单元测试
+- 关键页面截图基准
+- 一份“当前支持范围”清单
+
+建议优先覆盖的 fixture：
+
+- `4b00a85c247c47bdaeb01aeec562c90f.pptx`
+- `区级平台介绍.pptx`
+- `watercolor.pptx`
+- `math_calculus_formulas.pptx`
+
+这一阶段结束标准：
+
+- 能稳定复现文本、颜色、箭头、bullet、crop、math 资源问题
+- 每次修复后可以自动验证是否影响既有页面
+
+### 阶段 B：整理解析增强层
+
+目标：
+
+- 把当前分散在 enhancer 和 normalize 里的高保真补丁整理成可维护结构
+
+建议周期：
+
+- 1 周
+
+建议交付物：
+
+- 将 [textBodyInsets.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/textBodyInsets.ts) 按职责拆分
+- 明确 `placeholder / bullet / line marker / text inset / media mime` 几类 enhancer 边界
+- 为 enhancer 增加 fixture 测试
+- 统一 raw element 扩展字段定义
+
+建议拆分方向：
+
+- `enhancers/text-body.ts`
+- `enhancers/bullets.ts`
+- `enhancers/line-markers.ts`
+- `enhancers/placeholders.ts`
+- `enhancers/media-mime.ts`
+
+这一阶段结束标准：
+
+- enhancer 不再是单个大文件堆逻辑
+- 新增某类 PPT XML 补丁时，有明确落点
+
+### 阶段 C：拆 Runtime Engine
+
+目标：
+
+- 把当前集中在 [createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts) 的逻辑拆成可演进模块
+
+建议周期：
+
+- 1 到 2 周
+
+建议交付物：
+
+- `session-store.ts`
+- `playback-policy.ts`
+- `timeline-engine.ts`
+- `transition-engine.ts`
+- `media-engine.ts`
+- `input-engine.ts`
+
+建议拆分顺序：
+
+1. Session Store
+2. Playback Policy
+3. Timeline Engine
+4. Transition Engine
+5. Media Engine
+6. Input Engine
+
+原因：
+
+- Session 与 Policy 最容易先抽离
+- Timeline / Transition / Media 是后续功能增量的主要落点
+- Input 最后接入，避免过早耦合 UI
+
+这一阶段结束标准：
+
+- `createPresentationRuntime.ts` 只剩 facade 和装配逻辑
+- runtime state 读写边界明确
+
+### 阶段 D：补完整 Timeline / Transition / Media
+
+目标：
+
+- 从“基础播放”升级到“像 PPT 的播放”
+
+建议周期：
+
+- 2 周
+
+建议交付物：
+
+- animation progress frame
+- 更多 animation effect 支持
+- typed transition dispatch
+- video/audio 与 runtime 同步
+- preload / release 策略
+- transition renderer 组件
+
+建议优先做的能力：
+
+- `fade / appear` 之外的基础动画
+- transition type 到 renderer 的映射
+- 媒体 `play/pause/seek/mute` 同步
+- slide 级 preload current / next
+
+这一阶段结束标准：
+
+- 动画和转场不再只是“统一 opacity/transform 过渡”
+- 媒体元素开始真正受 runtime 控制
+
+### 阶段 E：补复杂元素 Renderer
+
+目标：
+
+- 解决当前类型声明存在、但实际不能渲染的问题
+
+建议周期：
+
+- 2 周
+
+建议交付物：
+
+- `TableRenderer`
+- `ChartRenderer`
+- `DiagramRenderer`
+- 对应 fixture 与回归样例
+
+建议优先顺序：
+
+1. `table`
+2. `chart`
+3. `diagram`
+
+原因：
+
+- `table` 是业务 PPT 中最常见且最容易暴露缺口的复杂元素
+- `chart` 和 `diagram` 适合放在有回归体系之后做
+
+这一阶段结束标准：
+
+- `NormalizedElementType` 中声明的复杂元素，不再只是类型占位
+
+### 阶段 F：补演示增强能力
+
+目标：
+
+- 让播放器从“可预览”升级到“可演示”
+
+建议周期：
+
+- 1 到 2 周
+
+建议交付物：
+
+- keyboard hotkeys
+- presenter dual view
+- timeline scrubber
+- laser pointer
+- annotation layer
+- fullscreen overlay
+
+这一阶段结束标准：
+
+- 演示模式不再只是基础面板
+- 用户可以用接近真实演示工具的方式操作播放器
+
+### 里程碑建议
+
+如果按里程碑看，建议分成 3 个版本：
+
+- `M1 正确性版本`
+  - 完成阶段 A + B
+  - 重点是回归体系和 enhancer 整理
+
+- `M2 Runtime 版本`
+  - 完成阶段 C + D
+  - 重点是 engine 拆分、动画、转场、媒体调度
+
+- `M3 完整展示版本`
+  - 完成阶段 E + F
+  - 重点是复杂元素与演示增强
+
+### 最低可执行顺序
+
+如果只保留最必要的顺序，建议按下面执行：
+
+1. 建 fixture 和截图回归
+2. 拆 enhancer
+3. 拆 runtime facade
+4. 补 timeline / transition / media
+5. 补 table
+6. 再补 chart / diagram / presenter 增强
+
+这条路线的核心是：
+
+> 先让“修复是可控的”，再让“架构是可演进的”，最后补“功能完整性”。
