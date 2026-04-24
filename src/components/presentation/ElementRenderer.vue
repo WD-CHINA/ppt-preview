@@ -9,7 +9,7 @@ const props = defineProps<{
 
 const elementStyle = computed<CSSProperties>(() => {
   const hasText = Boolean(props.element.html || props.element.text)
-  const hasShapePath = props.element.type === 'shape' && Boolean(props.element.shape?.path)
+  const shapeVisualStyle = props.element.type === 'shape'
 
   return {
     left: `${props.element.bounds.x}px`,
@@ -22,8 +22,10 @@ const elementStyle = computed<CSSProperties>(() => {
     zIndex: props.element.order,
     ...props.element.style,
     overflow: hasText ? 'visible' : props.element.style.overflow,
-    background: hasShapePath ? 'transparent' : props.element.style.background,
-    border: hasShapePath ? 'none' : props.element.style.border,
+    background: shapeVisualStyle ? 'transparent' : props.element.style.background,
+    border: shapeVisualStyle ? 'none' : props.element.style.border,
+    borderRadius: shapeVisualStyle ? undefined : props.element.style.borderRadius,
+    boxShadow: shapeVisualStyle ? undefined : props.element.style.boxShadow,
   }
 })
 
@@ -36,7 +38,12 @@ const sanitizedHtml = computed(() => sanitizePresentationHtml(props.element.html
 
 const textClass = computed(() => ({
   'element-text': true,
-  'element-text--single-line': isShortSingleLineText(sanitizedHtml.value, props.element.text),
+  'element-text--single-line': isShortSingleLineText(
+    sanitizedHtml.value,
+    props.element.text,
+    props.element.bounds.width,
+    props.element.style.fontSize,
+  ),
 }))
 
 const childElements = computed(() => props.element.children ?? [])
@@ -46,6 +53,7 @@ const hasTextContent = computed(() => Boolean(props.element.html || props.elemen
 const shouldRenderText = computed(() => props.element.type === 'text' || hasTextContent.value)
 
 const shapePath = computed(() => props.element.shape?.path)
+const shouldRenderShapeSvg = computed(() => shouldRenderSvgShape(props.element) && Boolean(shapePath.value))
 
 const shapeFill = computed(() => {
   const background = props.element.style.background
@@ -107,6 +115,21 @@ const shapeViewBox = computed(() => {
   return `0 0 ${width} ${height}`
 })
 
+const shapeLayerStyle = computed<CSSProperties>(() => {
+  if (props.element.type !== 'shape') {
+    return {}
+  }
+
+  const hasShapePath = shouldRenderSvgShape(props.element)
+
+  return {
+    background: hasShapePath ? 'transparent' : props.element.style.background,
+    border: hasShapePath ? 'none' : props.element.style.border,
+    borderRadius: props.element.style.borderRadius,
+    boxShadow: props.element.style.boxShadow,
+  }
+})
+
 const textBoxStyle = computed<CSSProperties>(() => ({
   justifyContent: shouldApplyVerticalAlign.value ? mapVerticalAlign(props.element.shape?.vAlign) : 'flex-start',
   writingMode: props.element.shape?.isVertical ? 'vertical-rl' : 'horizontal-tb',
@@ -116,12 +139,8 @@ const textBoxStyle = computed<CSSProperties>(() => ({
 const shouldApplyVerticalAlign = computed(() => props.element.type === 'shape')
 
 const shouldApplyTextInset = computed(() => {
-  if (props.element.type === 'text') {
-    return false
-  }
-
   const shapeType = props.element.shape?.type
-  return props.element.type === 'shape' && (!shapeType || shapeType === 'rect')
+  return props.element.type === 'text' || (props.element.type === 'shape' && (!shapeType || shapeType === 'rect'))
 })
 
 const shouldRenderPlaceholder = computed(() => {
@@ -140,8 +159,9 @@ const shouldRenderPlaceholder = computed(() => {
 <template>
   <div class="element" :style="elementStyle">
     <svg
-      v-if="props.element.type === 'shape' && shapePath"
+      v-if="props.element.type === 'shape' && shouldRenderShapeSvg"
       class="element-shape-svg"
+      :style="shapeLayerStyle"
       :viewBox="shapeViewBox"
       preserveAspectRatio="none"
       aria-hidden="true"
@@ -184,7 +204,7 @@ const shouldRenderPlaceholder = computed(() => {
       />
     </svg>
 
-    <div v-else-if="props.element.type === 'shape'" class="element-shape"></div>
+    <div v-else-if="props.element.type === 'shape'" class="element-shape" :style="shapeLayerStyle"></div>
 
     <div v-if="shouldRenderText" :class="textClass" :style="textBoxStyle" v-html="sanitizedHtml || props.element.text"></div>
 
@@ -277,6 +297,7 @@ const shouldRenderPlaceholder = computed(() => {
 
 .element-text--single-line {
   width: max-content;
+  min-width: max-content;
   max-width: none;
 }
 
@@ -299,8 +320,11 @@ const shouldRenderPlaceholder = computed(() => {
 }
 
 .element-shape {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+  z-index: 0;
 }
 
 .element-shape-svg {
@@ -395,8 +419,11 @@ function formatTextInset(inset?: { left: number; right: number; top: number; bot
   }
 
   return {
-    marginLeft: `${inset.left}px`,
-    marginTop: `${inset.top}px`,
+    boxSizing: 'border-box',
+    paddingLeft: `${inset.left}px`,
+    paddingRight: `${inset.right}px`,
+    paddingTop: `${inset.top}px`,
+    paddingBottom: `${inset.bottom}px`,
   }
 }
 
@@ -405,7 +432,14 @@ function isBlankListItem(node: Element) {
   return text.length === 0
 }
 
-function isShortSingleLineText(html?: string, text?: string) {
+function isShortSingleLineText(
+  html?: string,
+  text?: string,
+  boundsWidth?: number,
+  fontSizeValue?: string,
+) {
+  const fontSize = parseFontSize(fontSizeValue)
+
   if (html && typeof DOMParser !== 'undefined') {
     const documentNode = new DOMParser().parseFromString(html, 'text/html')
 
@@ -413,17 +447,96 @@ function isShortSingleLineText(html?: string, text?: string) {
       return false
     }
 
+    if (hasCenteredText(documentNode)) {
+      return false
+    }
+
     const paragraphs = documentNode.querySelectorAll('p')
     const content = (documentNode.body.textContent ?? '').replace(/\s+/g, '')
-    return paragraphs.length <= 1 && content.length > 0 && content.length <= 32
+    return (
+      paragraphs.length <= 1 &&
+      content.length > 0 &&
+      content.length <= 32 &&
+      !looksLikeSentence(content) &&
+      canFitSingleLine(content, boundsWidth, fontSize)
+    )
   }
 
   const content = text?.replace(/\s+/g, '') ?? ''
-  return content.length > 0 && content.length <= 32
+  return (
+    content.length > 0 &&
+    content.length <= 32 &&
+    !looksLikeSentence(content) &&
+    canFitSingleLine(content, boundsWidth, fontSize)
+  )
+}
+
+function canFitSingleLine(content: string, boundsWidth?: number, fontSize = 16) {
+  if (!boundsWidth || boundsWidth <= 0) {
+    return false
+  }
+
+  const estimatedWidth = estimateTextWidth(content, fontSize)
+  return estimatedWidth <= boundsWidth * 0.9
+}
+
+function estimateTextWidth(content: string, fontSize: number) {
+  let width = 0
+
+  for (const char of content) {
+    if (/[\u4e00-\u9fff]/.test(char)) {
+      width += fontSize
+      continue
+    }
+
+    if (/[A-Z]/.test(char)) {
+      width += fontSize * 0.68
+      continue
+    }
+
+    if (/[a-z0-9]/.test(char)) {
+      width += fontSize * 0.56
+      continue
+    }
+
+    width += fontSize * 0.48
+  }
+
+  return width
+}
+
+function parseFontSize(value?: string) {
+  const parsed = value ? Number.parseFloat(value) : Number.NaN
+  return Number.isFinite(parsed) ? parsed : 16
+}
+
+function looksLikeSentence(content: string) {
+  return /[，。！？；：、,.!?;:]/.test(content)
+}
+
+function hasCenteredText(documentNode: Document) {
+  return Array.from(documentNode.querySelectorAll('p, span, div')).some((element) => {
+    const align = (element.getAttribute('align') ?? '').toLowerCase()
+    const style = (element.getAttribute('style') ?? '').toLowerCase().replace(/\s+/g, '')
+    return (
+      align === 'center' ||
+      style.includes('text-align:center') ||
+      style.includes('justify-content:center') ||
+      style.includes('align-items:center')
+    )
+  })
 }
 
 function shouldRenderLineMarker(type?: string) {
   return Boolean(type && type !== 'none')
+}
+
+function shouldRenderSvgShape(element: EvaluatedElementFrame) {
+  if (element.type !== 'shape' || !element.shape?.path) {
+    return false
+  }
+
+  return element.shape.type !== 'rect' && element.shape.type !== 'roundRect'
 }
 
 function getMarkerSize(marker?: { width?: string; length?: string }) {

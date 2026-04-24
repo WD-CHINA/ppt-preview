@@ -1,6 +1,11 @@
 import JSZip from 'jszip'
 import type { RawLineEnd, RawPptxDocument, RawPptxElement, RawTextBodyInset } from './types'
 
+interface BulletMarker {
+  char: string
+  fontFace: string | undefined
+}
+
 const EMU_PER_POINT = 12700
 const DEFAULT_INSET = {
   left: 7.2,
@@ -48,17 +53,21 @@ function extractSlideLineMarkers(slideXml: string) {
     (node) => node.tagName === 'p:sp' || node.tagName === 'p:cxnSp',
   )
 
-  return shapeNodes.map((shapeNode, shapeIndex) => {
-    const lineNode = shapeNode.getElementsByTagName('a:ln')[0]
+  return shapeNodes
+    .map((shapeNode, shapeIndex) => {
+      const lineNode = shapeNode.getElementsByTagName('a:ln')[0]
+      const headEnd = readLineEnd(lineNode?.getElementsByTagName('a:headEnd')[0])
+      const tailEnd = readLineEnd(lineNode?.getElementsByTagName('a:tailEnd')[0])
 
-    return {
-      name: readShapeName(shapeNode),
-      order: readOrder(shapeNode),
-      shapeIndex,
-      headEnd: readLineEnd(lineNode?.getElementsByTagName('a:headEnd')[0]),
-      tailEnd: readLineEnd(lineNode?.getElementsByTagName('a:tailEnd')[0]),
-    }
-  })
+      return {
+        name: readShapeName(shapeNode),
+        order: readOrder(shapeNode),
+        shapeIndex,
+        headEnd,
+        tailEnd,
+      }
+    })
+    .filter((marker) => marker.headEnd || marker.tailEnd)
 }
 
 function applyLineMarkers(
@@ -97,7 +106,7 @@ function applyLineMarkers(
     const order = readRawOrder(element.order)
     const markerByName = element.name ? markersByName.get(element.name) : undefined
     const markerByOrder = order !== undefined ? markersByOrder.get(order) : undefined
-    const fallbackMarker = markers[cursor.shapeIndex]
+    const fallbackMarker = element.name || order !== undefined ? undefined : markers[cursor.shapeIndex]
     const lineMarker = markerByName ?? markerByOrder ?? fallbackMarker
 
     if (lineMarker?.headEnd) {
@@ -154,9 +163,10 @@ function extractSlideTextBodyInsets(slideXml: string) {
 
       return {
         order: readOrder(shapeNode),
+        name: readShapeName(shapeNode),
         textIndex,
         inset: readTextBodyInset(bodyPr),
-        bulletChars: readBulletChars(shapeNode),
+        bulletMarkers: readBulletMarkers(shapeNode),
       }
     })
 }
@@ -165,23 +175,29 @@ function applyTextBodyInsets(
   elements: RawPptxElement[],
   insets: Array<{
     order: number | undefined
+    name?: string
     textIndex: number
     inset: RawTextBodyInset
-    bulletChars: string[]
+    bulletMarkers: BulletMarker[]
   }>,
+  cursor = { textIndex: 0 },
 ) {
-  let textIndex = 0
   const insetsByOrder = new Map<number, (typeof insets)[number]>()
+  const insetsByName = new Map<string, (typeof insets)[number]>()
 
   for (const entry of insets) {
     if (entry.order !== undefined) {
       insetsByOrder.set(entry.order, entry)
     }
+
+    if (entry.name) {
+      insetsByName.set(entry.name, entry)
+    }
   }
 
   for (const element of elements) {
     if (Array.isArray(element.elements)) {
-      applyTextBodyInsets(element.elements, insets)
+      applyTextBodyInsets(element.elements, insets, cursor)
     }
 
     if (!hasTextBody(element)) {
@@ -189,13 +205,14 @@ function applyTextBodyInsets(
     }
 
     const order = readRawOrder(element.order)
-    const entry = order !== undefined ? insetsByOrder.get(order) : undefined
-    const fallbackEntry = insets[textIndex]
-    const textBodyEntry = entry ?? fallbackEntry
+    const entryByName = element.name ? insetsByName.get(element.name) : undefined
+    const entryByOrder = order !== undefined ? insetsByOrder.get(order) : undefined
+    const fallbackEntry = insets[cursor.textIndex]
+    const textBodyEntry = entryByName ?? entryByOrder ?? fallbackEntry
 
     element.textBodyInset = textBodyEntry?.inset
-    applyCustomBulletMarkers(element, textBodyEntry?.bulletChars ?? [])
-    textIndex += 1
+    applyCustomBulletMarkers(element, textBodyEntry?.bulletMarkers ?? [])
+    cursor.textIndex += 1
   }
 }
 
@@ -222,14 +239,30 @@ function readTextBodyInset(bodyPr: Element | undefined): RawTextBodyInset {
   }
 }
 
-function readBulletChars(shapeNode: Element) {
+function readBulletMarkers(shapeNode: Element): BulletMarker[] {
   return Array.from(shapeNode.getElementsByTagName('a:p'))
-    .map((paragraphNode) => paragraphNode.getElementsByTagName('a:buChar')[0]?.getAttribute('char'))
-    .filter((char): char is string => Boolean(char))
+    .map((paragraphNode) => {
+      const char = paragraphNode.getElementsByTagName('a:buChar')[0]?.getAttribute('char')
+
+      if (!char) {
+        return undefined
+      }
+
+      const fontFace = paragraphNode.getElementsByTagName('a:buFont')[0]?.getAttribute('typeface') ?? undefined
+
+      return {
+        char,
+        fontFace,
+      }
+    })
+    .filter((marker): marker is BulletMarker => marker !== undefined)
 }
 
-function applyCustomBulletMarkers(element: RawPptxElement, bulletChars: string[]) {
-  if (bulletChars.length === 0 || typeof DOMParser === 'undefined') {
+function applyCustomBulletMarkers(
+  element: RawPptxElement,
+  bulletMarkers: BulletMarker[],
+) {
+  if (bulletMarkers.length === 0 || typeof DOMParser === 'undefined') {
     return
   }
 
@@ -249,18 +282,23 @@ function applyCustomBulletMarkers(element: RawPptxElement, bulletChars: string[]
   const listItems = Array.from(documentNode.querySelectorAll('li'))
 
   listItems.forEach((listItem, index) => {
-    const bulletChar = bulletChars[index] ?? bulletChars[0]
+    const bulletMarker = bulletMarkers[index] ?? bulletMarkers[0]
+    const bulletChar = normalizeBulletChar(bulletMarker)
 
     if (bulletChar) {
       listItem.style.listStyleType = 'none'
       listItem.style.display = 'flex'
       listItem.style.gap = '0.5em'
       listItem.style.alignItems = 'baseline'
+      listItem.style.paddingLeft = '0'
 
       if (!listItem.querySelector(':scope > .ppt-bullet-marker')) {
         const marker = documentNode.createElement('span')
         marker.className = 'ppt-bullet-marker'
         marker.textContent = bulletChar
+        if (bulletMarker?.fontFace) {
+          marker.style.fontFamily = bulletMarker.fontFace
+        }
         listItem.prepend(marker)
       }
     }
@@ -277,6 +315,18 @@ function findHtmlKey(element: RawPptxElement): 'content' | 'html' | 'contentHtml
 
 function looksLikeHtml(input: unknown) {
   return typeof input === 'string' && /<\/?[a-z][\s\S]*>/i.test(input)
+}
+
+function normalizeBulletChar(marker?: BulletMarker) {
+  if (!marker) {
+    return undefined
+  }
+
+  if (marker.fontFace === 'Wingdings' && marker.char === 'ü') {
+    return '√'
+  }
+
+  return marker.char
 }
 
 function readInset(bodyPr: Element | undefined, attribute: string, fallback: number) {

@@ -176,8 +176,10 @@ function normalizeStyle(type: NormalizedElementType, rawElement: RawPptxElement)
   applyShadowStyle(base, rawElement)
 
   if (type === 'shape') {
-    if (!rawElement.path) {
-      base.borderRadius = rawElement.style?.borderRadius ?? '12px'
+    const borderRadius = resolveShapeBorderRadius(rawElement)
+
+    if (borderRadius) {
+      base.borderRadius = borderRadius
     }
   }
 
@@ -200,6 +202,22 @@ function normalizeStyle(type: NormalizedElementType, rawElement: RawPptxElement)
     ...base,
     ...(rawElement.style ?? {}),
   }
+}
+
+function resolveShapeBorderRadius(rawElement: RawPptxElement) {
+  if (rawElement.style?.borderRadius) {
+    return rawElement.style.borderRadius
+  }
+
+  if (rawElement.shapType === 'roundRect') {
+    return '16px'
+  }
+
+  if (!rawElement.path || rawElement.shapType === 'rect') {
+    return '12px'
+  }
+
+  return undefined
 }
 
 function normalizeMedia(type: NormalizedElementType, rawElement: RawPptxElement): MediaResource | undefined {
