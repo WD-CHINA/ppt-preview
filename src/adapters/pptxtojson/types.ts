@@ -30,6 +30,9 @@ export interface RawPptxElement {
   content?: string
   src?: string
   blob?: Blob | string
+  picRef?: string
+  picBlob?: Blob | string
+  latex?: string
   base64?: string
   ref?: string
   mimeType?: string
@@ -62,6 +65,8 @@ export interface RawPptxElement {
   isFlipH?: boolean
   isFlipV?: boolean
   textBodyInset?: RawTextBodyInset
+  placeholderType?: string
+  placeholderIndex?: number
   lineHeadEnd?: RawLineEnd
   lineTailEnd?: RawLineEnd
   rect?: RawMediaRect

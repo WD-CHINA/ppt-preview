@@ -23,6 +23,7 @@ export async function enrichTextBodyInsets(
   }
 
   const zip = await JSZip.loadAsync(input)
+  await correctEmbeddedMediaMimeTypes(raw, zip)
 
   await Promise.all(
     raw.slides.map(async (slide, slideIndex) => {
@@ -45,6 +46,67 @@ export async function enrichTextBodyInsets(
   )
 
   return raw
+}
+
+async function correctEmbeddedMediaMimeTypes(raw: RawPptxDocument, zip: JSZip) {
+  if (!Array.isArray(raw.slides) || typeof Blob === 'undefined') {
+    return
+  }
+
+  for (const slide of raw.slides) {
+    const slideElements = [
+      ...(Array.isArray(slide.layoutElements) ? slide.layoutElements : []),
+      ...(Array.isArray(slide.elements) ? slide.elements : []),
+    ]
+
+    await correctElementsMediaMimeTypes(slideElements, zip)
+  }
+}
+
+async function correctElementsMediaMimeTypes(elements: RawPptxElement[], zip: JSZip) {
+  for (const element of elements) {
+    if (Array.isArray(element.elements)) {
+      await correctElementsMediaMimeTypes(element.elements, zip)
+    }
+
+    await correctSingleMediaMimeType(element, zip, 'ref', 'blob')
+    await correctSingleMediaMimeType(element, zip, 'picRef', 'picBlob')
+  }
+}
+
+async function correctSingleMediaMimeType(
+  element: RawPptxElement,
+  zip: JSZip,
+  refKey: 'ref' | 'picRef',
+  blobKey: 'blob' | 'picBlob',
+) {
+  const ref = element[refKey]
+
+  if (typeof ref !== 'string' || ref.length === 0) {
+    return
+  }
+
+  const normalizedPath = ref.replace(/^\/+/, '').replace(/^ppt\//, 'ppt/')
+  const file = zip.file(normalizedPath)
+
+  if (!file) {
+    return
+  }
+
+  const data = await file.async('uint8array')
+
+  if (!looksLikeSvg(data)) {
+    return
+  }
+
+  const svgBytes = new Uint8Array(data.byteLength)
+  svgBytes.set(data)
+  element[blobKey] = new Blob([svgBytes], { type: 'image/svg+xml' })
+}
+
+function looksLikeSvg(data: Uint8Array) {
+  const head = new TextDecoder('utf-8').decode(data.slice(0, 128)).trimStart()
+  return head.startsWith('<svg') || head.startsWith('<?xml')
 }
 
 function extractSlideLineMarkers(slideXml: string) {
@@ -138,6 +200,22 @@ function readShapeName(shapeNode: Element) {
   return undefined
 }
 
+function readPlaceholder(shapeNode: Element) {
+  const placeholderNode = shapeNode.getElementsByTagName('p:ph')[0]
+
+  if (!placeholderNode) {
+    return undefined
+  }
+
+  const rawIndex = placeholderNode.getAttribute('idx')
+  const index = rawIndex == null ? undefined : Number(rawIndex)
+
+  return {
+    type: placeholderNode.getAttribute('type') ?? undefined,
+    index: Number.isFinite(index) ? index : undefined,
+  }
+}
+
 function readLineEnd(lineEndNode: Element | undefined): RawLineEnd | undefined {
   const type = lineEndNode?.getAttribute('type')
 
@@ -160,6 +238,7 @@ function extractSlideTextBodyInsets(slideXml: string) {
     .filter((shapeNode) => shapeNode.getElementsByTagName('p:txBody').length > 0)
     .map((shapeNode, textIndex) => {
       const bodyPr = shapeNode.getElementsByTagName('a:bodyPr')[0]
+      const placeholder = readPlaceholder(shapeNode)
 
       return {
         order: readOrder(shapeNode),
@@ -167,6 +246,8 @@ function extractSlideTextBodyInsets(slideXml: string) {
         textIndex,
         inset: readTextBodyInset(bodyPr),
         bulletMarkers: readBulletMarkers(shapeNode),
+        placeholderType: placeholder?.type,
+        placeholderIndex: placeholder?.index,
       }
     })
 }
@@ -179,6 +260,8 @@ function applyTextBodyInsets(
     textIndex: number
     inset: RawTextBodyInset
     bulletMarkers: BulletMarker[]
+    placeholderType?: string
+    placeholderIndex?: number
   }>,
   cursor = { textIndex: 0 },
 ) {
@@ -211,6 +294,8 @@ function applyTextBodyInsets(
     const textBodyEntry = entryByName ?? entryByOrder ?? fallbackEntry
 
     element.textBodyInset = textBodyEntry?.inset
+    element.placeholderType = textBodyEntry?.placeholderType
+    element.placeholderIndex = textBodyEntry?.placeholderIndex
     applyCustomBulletMarkers(element, textBodyEntry?.bulletMarkers ?? [])
     cursor.textIndex += 1
   }

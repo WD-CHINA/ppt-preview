@@ -406,6 +406,8 @@ function sanitizePresentationHtml(html?: string) {
     }
   }
 
+  normalizeTextWhitespace(documentNode.body)
+
   return documentNode.body.innerHTML
 }
 
@@ -462,13 +464,33 @@ function isBlankListItem(node: Element) {
   return text.length === 0
 }
 
+function normalizeTextWhitespace(root: ParentNode) {
+  const documentNode = root.ownerDocument
+
+  if (!documentNode) {
+    return
+  }
+
+  const walker = documentNode.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let currentNode = walker.nextNode()
+
+  while (currentNode) {
+    currentNode.textContent = (currentNode.textContent ?? '').replace(/[\u00a0\u202f]/g, ' ')
+    currentNode = walker.nextNode()
+  }
+}
+
 function isShortSingleLineText(
   html?: string,
   text?: string,
   boundsWidth?: number,
   fontSizeValue?: string,
 ) {
-  const fontSize = parseFontSize(fontSizeValue)
+  const fontSize = resolveFontSize(fontSizeValue, html)
+
+  if (fontSize >= 36) {
+    return false
+  }
 
   if (html && typeof DOMParser !== 'undefined') {
     const documentNode = new DOMParser().parseFromString(html, 'text/html')
@@ -538,6 +560,21 @@ function estimateTextWidth(content: string, fontSize: number) {
 function parseFontSize(value?: string) {
   const parsed = value ? Number.parseFloat(value) : Number.NaN
   return Number.isFinite(parsed) ? parsed : 16
+}
+
+function resolveFontSize(value?: string, html?: string) {
+  const fromStyle = parseFontSize(value)
+
+  if (value && Number.isFinite(Number.parseFloat(value))) {
+    return fromStyle
+  }
+
+  if (!html) {
+    return fromStyle
+  }
+
+  const match = html.match(/font-size\s*:\s*([0-9.]+)(?:pt|px)?/i)
+  return match?.[1] ? parseFontSize(match[1]) : fromStyle
 }
 
 function looksLikeSentence(content: string) {

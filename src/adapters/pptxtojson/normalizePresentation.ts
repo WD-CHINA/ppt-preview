@@ -15,24 +15,32 @@ const CSS_PX_PER_POINT = 96 / 72
 
 export function normalizePresentation(raw: RawPptxDocument): NormalizedPresentation {
   const slides = Array.isArray(raw.slides) ? raw.slides : []
+  const themeColors = normalizeThemeColors(raw.themeColors)
 
   return {
     width: normalizeOptionalPointLength(raw.size?.width, DEFAULT_WIDTH),
     height: normalizeOptionalPointLength(raw.size?.height, DEFAULT_HEIGHT),
     theme: {
-      colors: normalizeThemeColors(raw.themeColors),
+      colors: themeColors,
     },
     usedFonts: Array.isArray(raw.usedFonts) ? raw.usedFonts : [],
-    slides: slides.map((slide, index) => normalizeSlide(slide, index)),
+    slides: slides.map((slide, index) => normalizeSlide(slide, index, themeColors)),
   }
 }
 
-function normalizeSlide(rawSlide: RawPptxSlide, slideIndex: number) {
+function normalizeSlide(
+  rawSlide: RawPptxSlide,
+  slideIndex: number,
+  themeColors: Record<string, string>,
+) {
   const elements = [
     ...(Array.isArray(rawSlide.layoutElements) ? rawSlide.layoutElements : []),
     ...(Array.isArray(rawSlide.elements) ? rawSlide.elements : []),
   ]
-  const normalizedElements = elements.map((element, index) => normalizeElement(element, slideIndex, index))
+  const normalizedElements = harmonizeRepeatedTextColors(
+    elements.map((element, index) => normalizeElement(element, slideIndex, index)),
+  )
+  applyPlaceholderThemeColors(normalizedElements, themeColors)
 
   return {
     id: String(rawSlide.id ?? `slide-${slideIndex + 1}`),
@@ -49,6 +57,163 @@ function normalizeSlide(rawSlide: RawPptxSlide, slideIndex: number) {
       .sort((a, b) => a.order - b.order),
     animations: normalizeAnimations(rawSlide, elements, slideIndex),
   }
+}
+
+function applyPlaceholderThemeColors(elements: NormalizedElement[], themeColors: Record<string, string>) {
+  const lightTextColor = normalizeColorValue(themeColors['theme-4'] ?? themeColors['theme-2'])
+
+  if (!lightTextColor) {
+    return
+  }
+
+  for (const element of elements) {
+    if (!isTextLikeElement(element)) {
+      continue
+    }
+
+    const rawElement = element.raw as RawPptxElement | undefined
+    const placeholderType = rawElement?.placeholderType
+    const currentColor = extractResolvedTextColor(element)
+
+    if (!placeholderType || !currentColor || !isDefaultTextColor(currentColor)) {
+      continue
+    }
+
+    if (placeholderType === 'subTitle' || placeholderType === 'body') {
+      applyResolvedTextColor(element, lightTextColor)
+    }
+  }
+}
+
+function harmonizeRepeatedTextColors(elements: NormalizedElement[]) {
+  const groups = new Map<string, NormalizedElement[]>()
+
+  for (const element of elements) {
+    if (!isTextLikeElement(element)) {
+      continue
+    }
+
+    const signature = getRepeatedTextSignature(element)
+
+    if (!signature) {
+      continue
+    }
+
+    const siblings = groups.get(signature)
+
+    if (siblings) {
+      siblings.push(element)
+      continue
+    }
+
+    groups.set(signature, [element])
+  }
+
+  for (const siblings of groups.values()) {
+    if (siblings.length < 2) {
+      continue
+    }
+
+    const referenceColor = siblings
+      .map((element) => extractResolvedTextColor(element))
+      .find((color) => color != null && !isDefaultTextColor(color))
+
+    if (!referenceColor) {
+      continue
+    }
+
+    for (const element of siblings) {
+      const currentColor = extractResolvedTextColor(element)
+
+      if (!currentColor || !isDefaultTextColor(currentColor)) {
+        continue
+      }
+
+      applyResolvedTextColor(element, referenceColor)
+    }
+  }
+
+  return elements
+}
+
+function isTextLikeElement(element: NormalizedElement) {
+  return element.type === 'text' || typeof element.html === 'string' || typeof element.text === 'string'
+}
+
+function getRepeatedTextSignature(element: NormalizedElement) {
+  const content = normalizeRepeatedTextContent(element.html ?? element.text)
+
+  if (!content) {
+    return undefined
+  }
+
+  return [
+    content,
+    element.style.fontFamily ?? '',
+    element.style.fontSize ?? '',
+    Math.round(element.bounds.width),
+    Math.round(element.bounds.height),
+  ].join('|')
+}
+
+function normalizeRepeatedTextContent(input?: string) {
+  if (!input) {
+    return ''
+  }
+
+  const plainText = input.replace(/<[^>]+>/g, ' ')
+  return plainText.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function extractResolvedTextColor(element: NormalizedElement) {
+  const spanColor = extractHtmlTextColor(element.html)
+
+  if (spanColor) {
+    return spanColor
+  }
+
+  return normalizeColorValue(element.style.color)
+}
+
+function extractHtmlTextColor(html?: string) {
+  if (!html) {
+    return undefined
+  }
+
+  const match = html.match(/color\s*:\s*([^;"]+)/i)
+  return normalizeColorValue(match?.[1])
+}
+
+function normalizeColorValue(value?: string) {
+  if (!value) {
+    return undefined
+  }
+
+  return value.replace(/\s+/g, '').toLowerCase()
+}
+
+function isDefaultTextColor(color: string) {
+  return color === '#000000' || color === '#111827' || color === 'rgb(0,0,0)' || color === 'rgb(17,24,39)'
+}
+
+function applyResolvedTextColor(element: NormalizedElement, color: string) {
+  element.style.color = color
+
+  if (!element.html) {
+    return
+  }
+
+  if (/color\s*:/i.test(element.html)) {
+    element.html = element.html.replace(/color\s*:\s*([^;"]+)/gi, `color: ${color}`)
+    return
+  }
+
+  if (/style=/i.test(element.html)) {
+    element.html = element.html.replace(/style="([^"]*)"/i, `style="$1; color: ${color};"`)
+    return
+  }
+
+  element.html = element.html.replace(/<span\b([^>]*)>/i, `<span$1 style="color: ${color};">`)
 }
 
 function normalizeBackground(rawSlide: RawPptxSlide): SlideBackground {
@@ -225,14 +390,17 @@ function normalizeMedia(type: NormalizedElementType, rawElement: RawPptxElement)
     return undefined
   }
 
-  const directBlobUrl = typeof rawElement.blob === 'string' ? rawElement.blob : undefined
+  const blobSource = rawElement.blob instanceof Blob || typeof rawElement.blob === 'string'
+    ? rawElement.blob
+    : rawElement.picBlob
+  const directBlobUrl = typeof blobSource === 'string' ? blobSource : undefined
   const objectUrl =
-    rawElement.blob instanceof Blob && typeof URL !== 'undefined' ? URL.createObjectURL(rawElement.blob) : undefined
+    blobSource instanceof Blob && typeof URL !== 'undefined' ? URL.createObjectURL(blobSource) : undefined
 
   return {
     src: normalizeMediaSource(rawElement),
     objectUrl: objectUrl ?? directBlobUrl,
-    blob: rawElement.blob instanceof Blob || typeof rawElement.blob === 'string' ? rawElement.blob : undefined,
+    blob: blobSource instanceof Blob || typeof blobSource === 'string' ? blobSource : undefined,
     mimeType: typeof rawElement.mimeType === 'string' ? rawElement.mimeType : undefined,
     poster: typeof rawElement.poster === 'string' ? rawElement.poster : undefined,
     preload: type === 'audio' ? 'metadata' : 'auto',
@@ -307,7 +475,7 @@ function normalizeThemeColors(input: RawPptxDocument['themeColors']) {
 }
 
 function normalizeMediaSource(rawElement: RawPptxElement) {
-  const candidates = [rawElement.src, rawElement.base64, rawElement.ref]
+  const candidates = [rawElement.src, rawElement.base64, rawElement.ref, rawElement.picRef]
 
   for (const candidate of candidates) {
     if (typeof candidate === 'string' && candidate.length > 0) {
