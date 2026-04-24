@@ -237,6 +237,7 @@ function normalizeMedia(type: NormalizedElementType, rawElement: RawPptxElement)
     poster: typeof rawElement.poster === 'string' ? rawElement.poster : undefined,
     preload: type === 'audio' ? 'metadata' : 'auto',
     cleanup: objectUrl ? 'revoke-object-url' : 'keep',
+    crop: normalizeMediaCrop(rawElement),
   }
 }
 
@@ -315,6 +316,33 @@ function normalizeMediaSource(rawElement: RawPptxElement) {
   }
 
   return undefined
+}
+
+function normalizeMediaCrop(rawElement: RawPptxElement) {
+  const rect = rawElement.rect
+
+  if (!rect || typeof rect !== 'object') {
+    return undefined
+  }
+
+  const left = normalizeCropRatio(rect.l)
+  const right = normalizeCropRatio(rect.r)
+  const top = normalizeCropRatio(rect.t)
+  const bottom = normalizeCropRatio(rect.b)
+
+  if (left === 0 && right === 0 && top === 0 && bottom === 0) {
+    return undefined
+  }
+
+  return { left, right, top, bottom }
+}
+
+function normalizeCropRatio(value: number | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 0
+  }
+
+  return Math.min(Math.max(value / 100, 0), 0.95)
 }
 
 function normalizeFillImageSource(value: unknown) {

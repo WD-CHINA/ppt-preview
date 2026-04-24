@@ -34,6 +34,28 @@ const mediaSource = computed(() => {
   return props.element.media?.objectUrl ?? inlineBlob ?? props.element.media?.src ?? ''
 })
 
+const mediaStyle = computed<CSSProperties>(() => {
+  const crop = props.element.media?.crop
+
+  if (!crop) {
+    return {}
+  }
+
+  const visibleWidth = Math.max(1 - crop.left - crop.right, 0.01)
+  const visibleHeight = Math.max(1 - crop.top - crop.bottom, 0.01)
+
+  return {
+    position: 'absolute',
+    width: `${100 / visibleWidth}%`,
+    height: `${100 / visibleHeight}%`,
+    maxWidth: 'none',
+    maxHeight: 'none',
+    left: `${(-crop.left / visibleWidth) * 100}%`,
+    top: `${(-crop.top / visibleHeight) * 100}%`,
+    objectFit: 'fill',
+  }
+})
+
 const sanitizedHtml = computed(() => sanitizePresentationHtml(props.element.html))
 
 const textClass = computed(() => ({
@@ -211,6 +233,7 @@ const shouldRenderPlaceholder = computed(() => {
     <img
       v-else-if="props.element.type === 'image' && mediaSource"
       class="element-media"
+      :style="mediaStyle"
       :src="mediaSource"
       :alt="props.element.name"
     />
@@ -236,6 +259,7 @@ const shouldRenderPlaceholder = computed(() => {
     <img
       v-else-if="props.element.type === 'math' && mediaSource"
       class="element-media"
+      :style="mediaStyle"
       :src="mediaSource"
       :alt="props.element.name"
     />
@@ -428,7 +452,13 @@ function formatTextInset(inset?: { left: number; right: number; top: number; bot
 }
 
 function isBlankListItem(node: Element) {
-  const text = (node.textContent ?? '').replace(/[\s\u00a0\u200b-\u200d\ufeff]/g, '')
+  const clone = node.cloneNode(true)
+
+  if (clone instanceof Element) {
+    clone.querySelectorAll('.ppt-bullet-marker').forEach((marker) => marker.remove())
+  }
+
+  const text = (clone.textContent ?? '').replace(/[\s\u00a0\u200b-\u200d\ufeff]/g, '')
   return text.length === 0
 }
 

@@ -64,6 +64,7 @@ export interface RawPptxElement {
   textBodyInset?: RawTextBodyInset
   lineHeadEnd?: RawLineEnd
   lineTailEnd?: RawLineEnd
+  rect?: RawMediaRect
   [key: string]: unknown
 }
 
@@ -78,6 +79,13 @@ export interface RawLineEnd {
   type?: string
   width?: string
   length?: string
+}
+
+export interface RawMediaRect {
+  l?: number
+  r?: number
+  t?: number
+  b?: number
 }
 
 export interface RawPptxAnimation {

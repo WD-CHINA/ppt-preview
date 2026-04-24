@@ -43,6 +43,12 @@ export interface MediaResource {
   poster?: string
   preload?: 'auto' | 'metadata' | 'none'
   cleanup?: MediaCleanupPolicy
+  crop?: {
+    left: number
+    right: number
+    top: number
+    bottom: number
+  }
 }
 
 export interface NormalizedElementBounds {
