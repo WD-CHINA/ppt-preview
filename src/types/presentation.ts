@@ -160,11 +160,24 @@ export interface EvaluatedElementFrame {
   children?: EvaluatedElementFrame[]
 }
 
+export interface EvaluatedMediaFrame {
+  elementId: string
+  type: Extract<NormalizedElementType, 'image' | 'video' | 'audio' | 'math'>
+  media: MediaResource
+  playback?: {
+    action: 'play' | 'pause'
+    muted: boolean
+    playbackRate: number
+    seekMs: number
+  }
+}
+
 export interface EvaluatedSlideFrame {
   slideId: string
   slideName: string
   background: SlideBackground
   elements: EvaluatedElementFrame[]
+  media: EvaluatedMediaFrame[]
 }
 
 export interface PresentationFrame {

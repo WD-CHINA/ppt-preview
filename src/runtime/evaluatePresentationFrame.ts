@@ -1,13 +1,14 @@
 import type {
   EvaluatedElementFrame,
+  EvaluatedMediaFrame,
   EvaluatedSlideFrame,
-  NormalizedAnimation,
   NormalizedElement,
   NormalizedPresentation,
   NormalizedSlide,
   PresentationFrame,
   PresentationRuntimeState,
 } from '../types/presentation'
+import { evaluateAnimationVisibility } from './timeline/timelineEngine'
 
 export function evaluatePresentationFrame(
   model: NormalizedPresentation,
@@ -43,7 +44,42 @@ function evaluateSlideFrame(
     slideName: slide.name,
     background: slide.background,
     elements: slide.elements.map((element) => evaluateElementFrame(slide, element, state)),
+    media: collectEvaluatedMediaFrames(slide.elements, state),
   }
+}
+
+function collectEvaluatedMediaFrames(
+  elements: NormalizedElement[],
+  state?: PresentationRuntimeState,
+): EvaluatedMediaFrame[] {
+  return elements.flatMap((element) => {
+    const childMedia = element.children ? collectEvaluatedMediaFrames(element.children, state) : []
+
+    if (!element.media || !isEvaluatedMediaType(element.type)) {
+      return childMedia
+    }
+
+    const frame: EvaluatedMediaFrame = {
+      elementId: element.id,
+      type: element.type,
+      media: element.media,
+    }
+
+    if (state && (element.type === 'video' || element.type === 'audio')) {
+      frame.playback = {
+        action: state.sessionStatus === 'playing' || state.sessionStatus === 'transitioning' ? 'play' : 'pause',
+        muted: state.isMuted,
+        playbackRate: state.playbackRate,
+        seekMs: Math.max(0, state.timelinePositionMs),
+      }
+    }
+
+    return [frame, ...childMedia]
+  })
+}
+
+function isEvaluatedMediaType(type: NormalizedElement['type']): type is EvaluatedMediaFrame['type'] {
+  return type === 'image' || type === 'video' || type === 'audio' || type === 'math'
 }
 
 function evaluateElementFrame(
@@ -82,55 +118,5 @@ function evaluateElementAnimationState(
     return { visible: true, opacity: 1 }
   }
 
-  if (animation.trigger === 'onClick') {
-    const triggerIndex = getOnClickAnimationIndex(slide.animations, animation.id)
-    const isShown = triggerIndex < state.currentTriggerIndex
-    return {
-      visible: isShown,
-      opacity: isShown ? 1 : 0,
-    }
-  }
-
-  const autoSequence = buildAutoSequence(slide.animations)
-  const autoEntry = autoSequence.find((entry) => entry.animation.id === animation.id)
-
-  if (!autoEntry) {
-    return { visible: true, opacity: 1 }
-  }
-
-  if (state.timelinePositionMs <= autoEntry.startMs) {
-    return { visible: false, opacity: 0 }
-  }
-
-  if (state.timelinePositionMs >= autoEntry.endMs) {
-    return { visible: true, opacity: 1 }
-  }
-
-  const progress = (state.timelinePositionMs - autoEntry.startMs) / Math.max(autoEntry.animation.durationMs, 1)
-  return {
-    visible: true,
-    opacity: animation.effect === 'appear' ? 1 : progress,
-  }
-}
-
-function getOnClickAnimationIndex(animations: NormalizedAnimation[], animationId: string) {
-  return animations.filter((animation) => animation.trigger === 'onClick').findIndex((animation) => animation.id === animationId)
-}
-
-function buildAutoSequence(animations: NormalizedAnimation[]) {
-  let cursor = 0
-
-  return animations
-    .filter((animation) => animation.trigger !== 'onClick')
-    .map((animation) => {
-      const startMs = animation.trigger === 'withPrevious' ? Math.max(0, cursor - animation.durationMs) : cursor
-      const endMs = startMs + animation.durationMs
-      cursor = Math.max(cursor, endMs)
-
-      return {
-        animation,
-        startMs,
-        endMs,
-      }
-    })
+  return evaluateAnimationVisibility(animation, slide.animations, state)
 }

@@ -1,9 +1,16 @@
 <script setup lang="ts">
-import { computed, useTemplateRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
 import PlaybackToolbar from './PlaybackToolbar.vue'
 import PresentationStage from './PresentationStage.vue'
 import PresenterPanel from './PresenterPanel.vue'
 import type { PresentationRuntime } from '../../runtime/createPresentationRuntime'
+import {
+  executeInputCommand,
+  getKeyboardInputCommand,
+  getPointerInputCommand,
+  getTouchInputCommand,
+  type TouchInputDescriptor,
+} from '../../runtime/input/inputEngine'
 import type { NormalizedPresentation, NormalizedSlide, PresentationFrame } from '../../types/presentation'
 
 const props = defineProps<{
@@ -68,6 +75,54 @@ async function toggleFullscreen() {
   await document.exitFullscreen()
   props.runtime.setFullscreen(false)
 }
+
+async function exitFullscreen() {
+  if (document.fullscreenElement) {
+    await document.exitFullscreen()
+  }
+  props.runtime.setFullscreen(false)
+}
+
+function handleKeyboardInput(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null
+  const command = getKeyboardInputCommand({
+    key: event.key,
+    code: event.code,
+    targetTagName: target?.tagName,
+    isContentEditable: target?.isContentEditable,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    shiftKey: event.shiftKey,
+  })
+
+  if (command.preventDefault) {
+    event.preventDefault()
+  }
+  executeInputCommand(props.runtime, command, { toggleFullscreen, exitFullscreen })
+}
+
+function handleStageClick(event: MouseEvent) {
+  const command = getPointerInputCommand({ button: event.button })
+
+  if (command.preventDefault) {
+    event.preventDefault()
+  }
+  executeInputCommand(props.runtime, command, { toggleFullscreen, exitFullscreen })
+}
+
+function handleStageSwipe(touch: TouchInputDescriptor) {
+  const command = getTouchInputCommand(touch)
+  executeInputCommand(props.runtime, command, { toggleFullscreen, exitFullscreen })
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyboardInput)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeyboardInput)
+})
 </script>
 
 <template>
@@ -121,7 +176,12 @@ async function toggleFullscreen() {
     />
 
     <section class="workspace">
-      <PresentationStage class="workspace-stage" :frame="props.frame" />
+      <PresentationStage
+        class="workspace-stage"
+        :frame="props.frame"
+        @stage-click="handleStageClick"
+        @stage-swipe="handleStageSwipe"
+      />
       <PresenterPanel
         v-if="props.runtime.state.presenterMode"
         class="workspace-panel"

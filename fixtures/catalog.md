@@ -159,3 +159,52 @@
 标签：
 
 - `unclassified`
+
+## 12. XML enhancer synthetic regression fixtures
+
+- 文件位置：
+  - [src/adapters/pptxtojson/enhancers/bullets.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/bullets.test.ts)
+  - [src/adapters/pptxtojson/enhancers/text-body.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/text-body.test.ts)
+  - [src/adapters/pptxtojson/enhancers/line-markers.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/line-markers.test.ts)
+  - [src/adapters/pptxtojson/enhancers/media-mime.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/media-mime.test.ts)
+  - [src/adapters/pptxtojson/enhancers/raw-enhancements.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/raw-enhancements.test.ts)
+- 状态：`covered-by-test`
+- 用途：解析增强层拆分过程中的最小回归样本，先锁住 bullet 字符兼容、text body inset / placeholder 注入、line marker 元数据读取、伪 PNG 真 SVG MIME 修正、raw element enhancer-owned 字段写入边界
+
+标签：
+
+- `xml-enhancer`
+- `text-inset`
+- `placeholder`
+- `bullet`
+- `arrow-marker`
+- `media-mime`
+- `math-media`
+
+## 13. Runtime synthetic regression fixtures
+
+- 文件位置：
+  - [src/runtime/createPresentationRuntime.test.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.test.ts)
+  - [src/runtime/sessionStore.test.ts](/Applications/work/ppt-preview/src/runtime/sessionStore.test.ts)
+  - [src/runtime/input/inputEngine.test.ts](/Applications/work/ppt-preview/src/runtime/input/inputEngine.test.ts)
+  - [src/runtime/media/mediaEngine.test.ts](/Applications/work/ppt-preview/src/runtime/media/mediaEngine.test.ts)
+  - [src/runtime/evaluatePresentationFrame.test.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.test.ts)
+  - [src/runtime/timeline/timelineEngine.test.ts](/Applications/work/ppt-preview/src/runtime/timeline/timelineEngine.test.ts)
+  - [src/runtime/transition/transitionEngine.test.ts](/Applications/work/ppt-preview/src/runtime/transition/transitionEngine.test.ts)
+- 说明文档：[fixtures/runtime-regression-cases.md](./runtime-regression-cases.md)
+- 状态：`covered-by-test`
+- 用途：Runtime Engine 拆分过程中的合成回归样本，先锁住 Session Store、Playback Policy、Timeline Engine、Transition Engine、Media Engine 与 Input Engine 行为
+
+标签：
+
+- `runtime`
+- `session-store`
+- `playback-policy`
+- `timeline-engine`
+- `transition-engine`
+- `media-engine`
+- `input-engine`
+- `keyboard-shortcuts`
+- `touch-swipe`
+- `media-sync`
+- `timing`

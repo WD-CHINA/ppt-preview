@@ -10,6 +10,8 @@
 
 当前样本目录中的源文件仍然放在 [public/](/Applications/work/ppt-preview/public)，这里先维护“索引和标签”，不复制二进制文件。
 
+补充约定：Runtime / Policy / Engine 拆分类问题可以使用不依赖 PPTX 的合成 fixture，记录在 [runtime-regression-cases.md](./runtime-regression-cases.md)。真实 PPTX fixture 用于视觉/解析还原，合成 fixture 用于锁住状态机行为边界。
+
 ## 使用约定
 
 每个 fixture 至少记录以下信息：
@@ -22,10 +24,12 @@
 
 问题标签建议复用以下集合：
 
+- `xml-enhancer`
 - `text-inset`
 - `text-wrap`
 - `text-color`
 - `text-position`
+- `placeholder`
 - `vertical-text`
 - `bullet`
 - `arrow-marker`
@@ -42,6 +46,10 @@
 - `transition`
 - `timing`
 - `media-sync`
+- `media-mime`
+- `input-engine`
+- `keyboard-shortcuts`
+- `touch-swipe`
 
 ## 维护原则
 

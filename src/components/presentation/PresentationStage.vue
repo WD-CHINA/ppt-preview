@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue'
 import SlideViewport from './SlideViewport.vue'
+import type { TouchInputDescriptor } from '../../runtime/input/inputEngine'
 import type { PresentationFrame } from '../../types/presentation'
 
 const props = defineProps<{
   frame: PresentationFrame
 }>()
 
+const emit = defineEmits<{
+  stageClick: [event: MouseEvent]
+  stageSwipe: [touch: TouchInputDescriptor]
+}>()
+
 const stageRef = useTemplateRef<HTMLElement>('stage')
 const stageWidth = shallowRef(0)
+const touchStart = shallowRef<{ x: number; y: number } | null>(null)
 let resizeObserver: ResizeObserver | undefined
 
 const stageStyle = computed(() => ({
@@ -24,6 +31,37 @@ const canvasStyle = computed(() => {
     transform: `scale(${scale})`,
   }
 })
+
+function handleMouseUp(event: MouseEvent) {
+  emit('stageClick', event)
+}
+
+function handleTouchStart(event: TouchEvent) {
+  const touch = event.changedTouches[0]
+
+  if (!touch) {
+    return
+  }
+
+  touchStart.value = { x: touch.clientX, y: touch.clientY }
+}
+
+function handleTouchEnd(event: TouchEvent) {
+  const start = touchStart.value
+  const touch = event.changedTouches[0]
+  touchStart.value = null
+
+  if (!start || !touch) {
+    return
+  }
+
+  emit('stageSwipe', {
+    startX: start.x,
+    startY: start.y,
+    endX: touch.clientX,
+    endY: touch.clientY,
+  })
+}
 
 onMounted(() => {
   if (!stageRef.value) {
@@ -48,7 +86,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="stage-shell">
+  <div class="stage-shell" @mouseup="handleMouseUp" @touchstart.passive="handleTouchStart" @touchend="handleTouchEnd">
     <div ref="stage" class="stage" :style="stageStyle">
       <div class="stage-canvas" :style="canvasStyle">
         <SlideViewport

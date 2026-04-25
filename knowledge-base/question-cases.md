@@ -175,3 +175,69 @@
   - `Cannot read properties of null (reading 'a:theme')`
 - 说明：
   - 这类问题已出现过，但还没有整理成稳定修复方案
+
+## 9. 解析增强层拆分
+
+### 9.1 单个 XML enhancer 文件继续膨胀会放大维护风险
+
+- 状态：`partial`
+- 典型现象：
+  - `textBodyInsets.ts` 同时承担 text inset、placeholder、bullet、line marker、media MIME 修正
+  - 新增 XML 补丁时容易把不相关逻辑耦合到同一文件
+- 已覆盖基线：
+  - `bullets.ts` 的 Wingdings `ü` -> `√` 兼容
+  - `text-body.ts` 的 text inset EMU -> point 与 placeholder 注入
+  - `line-markers.ts` 的 `a:headEnd / a:tailEnd` 元数据读取
+  - `media-mime.ts` 的伪 PNG 真 SVG Blob 修正
+  - `raw-enhancements.ts` 的 enhancer-owned raw element 字段写入边界
+- 代表测试：
+  - `src/adapters/pptxtojson/enhancers/bullets.test.ts`
+  - `src/adapters/pptxtojson/enhancers/text-body.test.ts`
+  - `src/adapters/pptxtojson/enhancers/line-markers.test.ts`
+  - `src/adapters/pptxtojson/enhancers/media-mime.test.ts`
+  - `src/adapters/pptxtojson/enhancers/raw-enhancements.test.ts`
+- 关键标签：
+  - `xml-enhancer`
+  - `text-inset`
+  - `placeholder`
+  - `bullet`
+  - `arrow-marker`
+  - `media-mime`
+  - `math-media`
+
+## 10. Runtime Engine 拆分
+
+### 9.1 集中式 Runtime 继续堆逻辑会放大回归风险
+
+- 状态：`partial`
+- 典型现象：
+  - `createPresentationRuntime.ts` 同时负责 state、policy、tick、trigger、transition
+  - 后续补 Timeline / Transition / Media 时容易互相影响
+- 已覆盖基线：
+  - `Session Store` 初始状态、slide state reset、`waitingTrigger` 同步
+  - `Playback Policy` 自动翻页与 click trigger 的优先级
+  - `Timeline Engine` click trigger 计数、自动动画序列、基础 visibility/opacity
+  - `Transition Engine` transition start / progress / finish
+  - `Media Engine` registry/cache/playback plan 与 Evaluator media frame
+  - `Input Engine` keyboard / pointer / touch gesture 到 runtime command 的映射
+  - `Runtime Facade` transition active 期间拒绝直接跳页 / 前后翻页，避免状态冻结
+- 代表测试：
+  - `src/runtime/createPresentationRuntime.test.ts`
+  - `src/runtime/sessionStore.test.ts`
+  - `src/runtime/input/inputEngine.test.ts`
+  - `src/runtime/media/mediaEngine.test.ts`
+  - `src/runtime/evaluatePresentationFrame.test.ts`
+  - `src/runtime/timeline/timelineEngine.test.ts`
+  - `src/runtime/transition/transitionEngine.test.ts`
+- 关键标签：
+  - `runtime`
+  - `session-store`
+  - `playback-policy`
+  - `timeline-engine`
+  - `transition-engine`
+  - `media-engine`
+  - `input-engine`
+  - `keyboard-shortcuts`
+  - `touch-swipe`
+  - `media-sync`
+  - `timing`

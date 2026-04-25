@@ -120,17 +120,20 @@ PPTX File
 - `math`
 - `group`
 
-### 2.5 XML 增强层已经明显强于旧分析
+### 2.5 XML 增强层已经明显强于旧分析，并开始模块化
 
-旧 gap 文档里把这部分描述得偏保守。实际上，[textBodyInsets.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/textBodyInsets.ts) 现在已经承担了一批高保真增强职责：
+旧 gap 文档里把这部分描述得偏保守。实际上，当前 XML enhancer 已经承担一批高保真增强职责，并已开始从单文件拆成模块。
 
-- 读取 `a:bodyPr` 的 text inset
-- 读取自定义 bullet 字符与 bullet font
-- 读取 `headEnd / tailEnd`
-- 读取 placeholder `type / idx`
-- 修正“扩展名是 png，文件内容其实是 svg”的媒体 MIME
+当前入口仍是 [textBodyInsets.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/textBodyInsets.ts)，但具体职责已经落到：
 
-这意味着解析层已经不仅是“补 inset”，而是在逐步承担 parser enhancer 的角色。
+- [enhancers/text-body.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/text-body.ts)：读取 `a:bodyPr` text inset、placeholder `type / idx`
+- [enhancers/bullets.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/bullets.ts)：读取自定义 bullet 字符与 bullet font，并兼容 `Wingdings + ü -> √`
+- [enhancers/line-markers.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/line-markers.ts)：读取 `headEnd / tailEnd`
+- [enhancers/media-mime.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/media-mime.ts)：修正“扩展名是 png，文件内容其实是 svg”的媒体 MIME
+- [enhancers/raw-enhancements.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/raw-enhancements.ts)：统一 enhancer-owned raw element 字段写入边界
+- [enhancers/shared.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/shared.ts)：共享 shape name / order 工具
+
+这意味着解析层已经不仅是“补 inset”，而是在逐步承担 parser enhancer 的角色，并开始具备可测试边界。
 
 ### 2.6 高保真渲染补丁已经落地一批
 
@@ -294,17 +297,27 @@ Presentation Runtime Facade
 
 ### 4.1 Input Engine
 
-当前没有独立输入系统。
+当前已经有基础输入系统。
+
+已经支持：
+
+- 键盘快捷键体系基础版
+- Space 播放/暂停
+- 左右方向键翻页
+- Enter / 舞台点击推进
+- 触摸横向滑动翻页
+- F 全屏切换
+- Esc 退出全屏
+- P 切换 Presenter 模式
+- editable target 与 ctrl/meta/alt 组合键保护
 
 仍然缺少：
 
-- 键盘快捷键体系
-- 空格播放/暂停或下一步
-- 左右方向键翻页
-- 触摸滑动
-- 点击舞台推进
-- 全屏快捷控制
-- Presenter 模式快捷控制
+- 可配置快捷键 schema
+- 空格“播放/暂停或下一步”的可配置策略
+- Presenter 模式专用快捷控制
+- 激光笔 / 标注模式输入路由
+- 更复杂触摸手势
 
 ### 4.2 复杂元素 renderer
 
@@ -400,8 +413,8 @@ Presentation Runtime Facade
 
 仍需补齐：
 
-- enhancer 模块继续拆分
-- fixture 测试
+- enhancer 模块继续拆分（首批 `text-body / bullets / line-markers / media-mime / raw-enhancements / shared` 已完成）
+- fixture 测试（首批 bullet / text-body / line marker / media MIME / raw enhancement 合成测试已完成）
 - 更系统的主题/字体/文本布局增强
 
 ### 阶段 2：重构 Runtime
@@ -507,7 +520,7 @@ Presentation Runtime Facade
 
 建议做：
 
-- keyboard hotkeys
+- configurable keyboard hotkeys
 - presenter dual view
 - timeline scrubber
 - laser pointer
@@ -544,7 +557,7 @@ Presentation Runtime Facade
 
 - `fixtures/` 目录，收敛当前高频问题 PPT
 - 每个 fixture 的页面清单和问题标签
-- XML enhancer 的最小单元测试
+- XML enhancer 的最小单元测试（首批 bullet / text-body / line marker / media MIME / raw enhancement 已完成）
 - 关键页面截图基准
 - 一份“当前支持范围”清单
 
@@ -572,18 +585,26 @@ Presentation Runtime Facade
 
 建议交付物：
 
-- 将 [textBodyInsets.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/textBodyInsets.ts) 按职责拆分
+- 将 [textBodyInsets.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/textBodyInsets.ts) 按职责拆分（首批已完成，入口保留 orchestration）
+- 已建立首批 enhancer 模块：
+  - `enhancers/text-body.ts`
+  - `enhancers/bullets.ts`
+  - `enhancers/line-markers.ts`
+  - `enhancers/media-mime.ts`
+  - `enhancers/raw-enhancements.ts`
+  - `enhancers/shared.ts`
 - 明确 `placeholder / bullet / line marker / text inset / media mime` 几类 enhancer 边界
-- 为 enhancer 增加 fixture 测试
-- 统一 raw element 扩展字段定义
+- 为 enhancer 增加 fixture 测试（首批 bullet / text-body / line marker / media MIME / raw enhancement 已完成）
+- 统一 raw element 扩展字段定义（已先用 `raw-enhancements.ts` 收敛 enhancer-owned 字段写入）
 
 建议拆分方向：
 
-- `enhancers/text-body.ts`
-- `enhancers/bullets.ts`
-- `enhancers/line-markers.ts`
+- `enhancers/text-body.ts`（已完成首批拆分）
+- `enhancers/bullets.ts`（已完成首批拆分）
+- `enhancers/line-markers.ts`（已完成首批拆分）
 - `enhancers/placeholders.ts`
-- `enhancers/media-mime.ts`
+- `enhancers/media-mime.ts`（已完成首批拆分）
+- `enhancers/raw-enhancements.ts`（已完成首批字段写入收敛）
 
 这一阶段结束标准：
 
@@ -591,6 +612,24 @@ Presentation Runtime Facade
 - 新增某类 PPT XML 补丁时，有明确落点
 
 ### 阶段 C：拆 Runtime Engine
+
+当前进展（本轮更新）：
+
+- 已先抽出 `Session Store`：`src/runtime/session/sessionStore.ts`
+- 已先抽出 `Playback Policy`：`src/runtime/policy/playbackPolicy.ts`
+- 已抽出基础 `Timeline Engine`：`src/runtime/timeline/timelineEngine.ts`
+- 已抽出基础 `Transition Engine`：`src/runtime/transition/transitionEngine.ts`
+- 已抽出基础 `Media Engine`：`src/runtime/media/mediaEngine.ts`
+- 已抽出基础 `Input Engine`：`src/runtime/input/inputEngine.ts`
+- 已增加 Runtime 合成回归测试：
+  - `src/runtime/createPresentationRuntime.test.ts`
+  - `src/runtime/sessionStore.test.ts`
+  - `src/runtime/input/inputEngine.test.ts`
+  - `src/runtime/media/mediaEngine.test.ts`
+  - `src/runtime/evaluatePresentationFrame.test.ts`
+  - `src/runtime/timeline/timelineEngine.test.ts`
+  - `src/runtime/transition/transitionEngine.test.ts`
+- `createPresentationRuntime.ts` 仍是 facade + tick 编排入口，后续继续把 Timeline/Transition/Media/Input 扩展到更完整效果与可配置策略
 
 目标：
 
@@ -606,8 +645,8 @@ Presentation Runtime Facade
 - `playback-policy.ts`
 - `timeline-engine.ts`
 - `transition-engine.ts`
-- `media-engine.ts`
-- `input-engine.ts`
+- `media-engine.ts`（基础 registry/cache/playback plan 已完成，仍需 DOM sync 与失败回退）
+- `input-engine.ts`（基础 keyboard/pointer/touch command mapping 已完成，仍需可配置快捷键与扩展输入路由）
 
 建议拆分顺序：
 
@@ -704,7 +743,7 @@ Presentation Runtime Facade
 
 建议交付物：
 
-- keyboard hotkeys
+- configurable keyboard hotkeys
 - presenter dual view
 - timeline scrubber
 - laser pointer

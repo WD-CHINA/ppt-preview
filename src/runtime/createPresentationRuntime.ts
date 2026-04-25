@@ -1,9 +1,27 @@
-import { reactive } from 'vue'
-import type { NormalizedPresentation, NormalizedSlide, PresentationRuntimeState } from '../types/presentation'
+import type { NormalizedPresentation, PresentationRuntimeState } from '../types/presentation'
+import {
+  createMediaEngineState,
+  syncMediaEngine,
+  type MediaEngineState,
+} from './media/mediaEngine'
+import { getPlaybackPolicyDecision } from './policy/playbackPolicy'
+import {
+  createSessionStore,
+  resetSlideSessionState,
+  setPlaybackRate as setSessionPlaybackRate,
+  syncWaitingTrigger as syncSessionWaitingTrigger,
+} from './session/sessionStore'
+import { countOnClickAnimations } from './timeline/timelineEngine'
+import {
+  beginSlideTransition,
+  getSlideTransitionDurationMs,
+  tickSlideTransition,
+} from './transition/transitionEngine'
 
 export interface PresentationRuntime {
   model: NormalizedPresentation
   state: PresentationRuntimeState
+  media: MediaEngineState
   play: () => void
   pause: () => void
   togglePlay: () => void
@@ -22,24 +40,9 @@ export interface PresentationRuntime {
 }
 
 export function createPresentationRuntime(model: NormalizedPresentation): PresentationRuntime {
-  const state = reactive<PresentationRuntimeState>({
-    sessionStatus: model.slides.length > 0 ? 'ready' : 'idle',
-    activeSlideIndex: 0,
-    timelinePositionMs: 0,
-    slideElapsedMs: 0,
-    currentTriggerIndex: 0,
-    waitingTrigger: false,
-    transitionProgress: 0,
-    transitionFromSlideIndex: null,
-    transitionToSlideIndex: null,
-    isFullscreen: false,
-    isMuted: false,
-    presenterMode: false,
-    loopEnabled: false,
-    playbackRate: 1,
-  })
-
-  syncWaitingTrigger()
+  const state = createSessionStore(model)
+  const media = createMediaEngineState(model)
+  syncMedia()
 
   function play() {
     if (model.slides.length === 0) {
@@ -72,9 +75,8 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
     }
 
     const activeSlide = model.slides[state.activeSlideIndex]
-    const onClickAnimations = getOnClickAnimations(activeSlide)
 
-    if (state.currentTriggerIndex < onClickAnimations.length) {
+    if (state.currentTriggerIndex < countOnClickAnimations(activeSlide?.animations ?? [])) {
       state.currentTriggerIndex += 1
       syncWaitingTrigger()
       return
@@ -100,6 +102,10 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
   }
 
   function nextSlide() {
+    if (state.transitionToSlideIndex != null) {
+      return
+    }
+
     if (model.slides.length === 0) {
       return
     }
@@ -109,6 +115,7 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
         goToSlide(0)
       } else {
         state.sessionStatus = 'ended'
+        syncMedia()
       }
       return
     }
@@ -117,6 +124,10 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
   }
 
   function previousSlide() {
+    if (state.transitionToSlideIndex != null) {
+      return
+    }
+
     if (model.slides.length === 0) {
       return
     }
@@ -125,30 +136,34 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
   }
 
   function goToSlide(index: number) {
+    if (state.transitionToSlideIndex != null) {
+      return
+    }
+
     const clampedIndex = Math.min(Math.max(index, 0), Math.max(model.slides.length - 1, 0))
 
     if (clampedIndex === state.activeSlideIndex) {
       resetSlideState()
       state.sessionStatus = 'ready'
+      syncMedia()
       return
     }
 
     const fromIndex = state.activeSlideIndex
     const toSlide = model.slides[clampedIndex]
-    const durationMs = Math.max(toSlide?.transition?.durationMs ?? 0, 0)
+    const durationMs = getSlideTransitionDurationMs(toSlide)
 
     state.activeSlideIndex = clampedIndex
     resetSlideState()
 
     if (durationMs > 0) {
-      state.transitionFromSlideIndex = fromIndex
-      state.transitionToSlideIndex = clampedIndex
-      state.transitionProgress = 0
-      state.sessionStatus = 'transitioning'
+      beginSlideTransition(state, { fromIndex, toIndex: clampedIndex, toSlide })
+      syncMedia()
       return
     }
 
     state.sessionStatus = 'ready'
+    syncMedia()
   }
 
   function seek(positionMs: number) {
@@ -174,7 +189,7 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
   }
 
   function setPlaybackRate(value: number) {
-    state.playbackRate = Math.max(0.25, Math.min(value, 3))
+    setSessionPlaybackRate(state, value)
   }
 
   function tick(deltaMs: number) {
@@ -186,16 +201,8 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
 
     if (state.transitionToSlideIndex != null) {
       const transitionSlide = model.slides[state.transitionToSlideIndex]
-      const durationMs = Math.max(transitionSlide?.transition?.durationMs ?? 0, 1)
-      state.transitionProgress = Math.min(1, state.transitionProgress + scaledDelta / durationMs)
-
-      if (state.transitionProgress >= 1) {
-        state.transitionProgress = 1
-        state.transitionFromSlideIndex = null
-        state.transitionToSlideIndex = null
-        state.sessionStatus = 'playing'
-      }
-
+      tickSlideTransition(state, transitionSlide, scaledDelta)
+      syncMedia()
       return
     }
 
@@ -204,34 +211,29 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
     syncWaitingTrigger()
 
     const activeSlide = model.slides[state.activeSlideIndex]
-    const advanceAfterMs = activeSlide?.autoplay.advanceAfterMs
+    const policyDecision = getPlaybackPolicyDecision(activeSlide, state)
 
-    if (
-      typeof advanceAfterMs === 'number' &&
-      state.slideElapsedMs >= advanceAfterMs &&
-      !state.waitingTrigger
-    ) {
+    if (policyDecision.type === 'advance-slide') {
       nextSlide()
     }
   }
 
   function resetSlideState() {
-    state.timelinePositionMs = 0
-    state.slideElapsedMs = 0
-    state.currentTriggerIndex = 0
-    state.waitingTrigger = false
-    state.transitionProgress = 0
-    syncWaitingTrigger()
+    resetSlideSessionState(state, model.slides[state.activeSlideIndex])
   }
 
   function syncWaitingTrigger() {
-    const activeSlide = model.slides[state.activeSlideIndex]
-    state.waitingTrigger = state.currentTriggerIndex < getOnClickAnimations(activeSlide).length
+    syncSessionWaitingTrigger(state, model.slides[state.activeSlideIndex])
+  }
+
+  function syncMedia() {
+    syncMediaEngine(media, state, model)
   }
 
   return {
     model,
     state,
+    media,
     play,
     pause,
     togglePlay,
@@ -248,8 +250,4 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
     setPlaybackRate,
     tick,
   }
-}
-
-function getOnClickAnimations(slide?: NormalizedSlide) {
-  return slide?.animations.filter((animation) => animation.trigger === 'onClick') ?? []
 }

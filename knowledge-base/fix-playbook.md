@@ -226,3 +226,207 @@
 
 - [src/adapters/pptxtojson/types.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/types.ts)
 - [src/adapters/pptxtojson/normalizePresentation.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/normalizePresentation.ts)
+
+## 7. 解析增强层拆分类
+
+### 7.1 `textBodyInsets.ts` 只保留 orchestration，具体 enhancer 分模块
+
+适用问题：
+
+- 单文件同时处理 text inset、placeholder、bullet、line marker、media MIME，后续补 XML 规则容易互相影响
+- enhancer 行为没有最小单测，改动只能靠真实 PPT 人工验证
+
+实践方案：
+
+- 将职责拆到 `src/adapters/pptxtojson/enhancers/`：
+  - `text-body.ts`：text inset、placeholder、text element matching
+  - `bullets.ts`：自定义 bullet 字符与 Wingdings 兼容
+  - `line-markers.ts`：`a:headEnd / a:tailEnd` 读取与注入
+  - `media-mime.ts`：伪 PNG 真 SVG 的 Blob MIME 修正
+  - `raw-enhancements.ts`：统一 enhancer-owned raw element 字段写入边界
+  - `shared.ts`：shape name / order 等公共读取工具
+- `textBodyInsets.ts` 暂时保留对外入口 `enrichTextBodyInsets()`，只负责读取 zip、遍历 slide、编排 enhancer
+- 先补最小合成测试，不依赖真实 PPTX 二进制：
+  - bullet 字符兼容
+  - text body inset EMU -> point 与 placeholder 注入
+  - line marker 读取
+  - media MIME 修正
+  - raw element enhancer-owned 字段写入边界
+
+代码落点：
+
+- [src/adapters/pptxtojson/textBodyInsets.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/textBodyInsets.ts)
+- [src/adapters/pptxtojson/enhancers/text-body.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/text-body.ts)
+- [src/adapters/pptxtojson/enhancers/bullets.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/bullets.ts)
+- [src/adapters/pptxtojson/enhancers/line-markers.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/line-markers.ts)
+- [src/adapters/pptxtojson/enhancers/media-mime.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/media-mime.ts)
+- [src/adapters/pptxtojson/enhancers/raw-enhancements.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/raw-enhancements.ts)
+- [src/adapters/pptxtojson/enhancers/shared.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/shared.ts)
+- [src/adapters/pptxtojson/enhancers/bullets.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/bullets.test.ts)
+- [src/adapters/pptxtojson/enhancers/text-body.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/text-body.test.ts)
+- [src/adapters/pptxtojson/enhancers/line-markers.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/line-markers.test.ts)
+- [src/adapters/pptxtojson/enhancers/media-mime.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/media-mime.test.ts)
+- [src/adapters/pptxtojson/enhancers/raw-enhancements.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/raw-enhancements.test.ts)
+
+仍未完成：
+
+- text-body / placeholder 的 DOMParser fixture 测试
+- enhancer-level 真实 slide XML fixture
+- raw element 扩展字段统一类型化
+
+## 8. Runtime Engine 拆分类
+
+### 7.1 先抽 `Session Store` 与 `Playback Policy`，不要一口气重写 Runtime
+
+适用问题：
+
+- `createPresentationRuntime.ts` 同时承载状态初始化、slide reset、trigger waiting、自动翻页策略和播放速率裁剪
+- Runtime 后续要继续拆 Timeline / Transition / Media，但缺少测试基线
+
+实践方案：
+
+- 新增 `session/sessionStore.ts`，集中维护：
+  - 初始 `PresentationRuntimeState`
+  - slide-scoped state reset
+  - `waitingTrigger` 与 onClick animation 数量同步
+  - `playbackRate` 边界裁剪
+- 新增 `policy/playbackPolicy.ts`，把“是否继续 / 等待 trigger / 自动翻页”从 `tick()` 中抽出
+- 先用合成 fixture 测状态机事实，再把真实 PPT fixture 接入视觉回归
+
+代码落点：
+
+- [src/runtime/session/sessionStore.ts](/Applications/work/ppt-preview/src/runtime/session/sessionStore.ts)
+- [src/runtime/policy/playbackPolicy.ts](/Applications/work/ppt-preview/src/runtime/policy/playbackPolicy.ts)
+- [src/runtime/sessionStore.test.ts](/Applications/work/ppt-preview/src/runtime/sessionStore.test.ts)
+- [fixtures/runtime-regression-cases.md](/Applications/work/ppt-preview/fixtures/runtime-regression-cases.md)
+
+验证命令：
+
+```bash
+pnpm test:run src/runtime/sessionStore.test.ts
+pnpm build
+```
+
+### 7.2 `Timeline Engine` 先沉淀纯函数，再从 Evaluator 中替换内联逻辑
+
+适用问题：
+
+- `evaluatePresentationFrame.ts` 内联 click trigger index、自动动画序列和 opacity 计算
+- 后续补更复杂动画效果时，Evaluator 会继续膨胀
+
+实践方案：
+
+- 新增 `timeline/timelineEngine.ts`，先提供无副作用纯函数：
+  - `countOnClickAnimations()`
+  - `getOnClickAnimationIndex()`
+  - `buildAutoAnimationSequence()`
+  - `evaluateAnimationVisibility()`
+- `Session Store` 复用 `countOnClickAnimations()`，避免 click trigger 统计规则分叉
+- `Evaluator` 只负责找到目标 animation，然后调用 timeline engine 计算 visibility/opacity
+
+代码落点：
+
+- [src/runtime/timeline/timelineEngine.ts](/Applications/work/ppt-preview/src/runtime/timeline/timelineEngine.ts)
+- [src/runtime/timeline/timelineEngine.test.ts](/Applications/work/ppt-preview/src/runtime/timeline/timelineEngine.test.ts)
+- [src/runtime/evaluatePresentationFrame.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.ts)
+
+### 7.3 `Transition Engine` 先承接状态写入，不急着做 typed renderer
+
+适用问题：
+
+- `createPresentationRuntime.ts` 内联 transition start/progress/finish 逻辑
+- 后续要做 typed transition dispatch，必须先让 transition 状态读写边界稳定
+
+实践方案：
+
+- 新增 `transition/transitionEngine.ts`：
+  - `getSlideTransitionDurationMs()`
+  - `beginSlideTransition()`
+  - `tickSlideTransition()`
+- facade 只负责决定何时跳页和传入目标 slide；progress 推进与 finish cleanup 交给 Transition Engine
+- 当前阶段只抽状态机，不引入 renderer 分发，避免一次性扩大范围
+
+代码落点：
+
+- [src/runtime/transition/transitionEngine.ts](/Applications/work/ppt-preview/src/runtime/transition/transitionEngine.ts)
+- [src/runtime/transition/transitionEngine.test.ts](/Applications/work/ppt-preview/src/runtime/transition/transitionEngine.test.ts)
+- [src/runtime/createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts)
+
+### 7.4 Facade 层必须保护 transition 中的导航入口
+
+适用问题：
+
+- transition 进行中再次调用 `goToSlide()` / `nextSlide()` / `previousSlide()`，可能造成 `sessionStatus` 与 `transitionToSlideIndex` 不一致
+- Evaluator 以 `transitionToSlideIndex != null` 判断 transitioning，但 Runtime tick 以 `sessionStatus` 判断是否推进，二者分歧会造成冻结帧
+
+实践方案：
+
+- 在 `goToSlide()`、`nextSlide()`、`previousSlide()` 入口优先判断 `transitionToSlideIndex != null`，transition active 时拒绝直接导航
+- 增加 facade 级回归测试，而不是只测底层 engine helper
+
+代码落点：
+
+- [src/runtime/createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts)
+- [src/runtime/createPresentationRuntime.test.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.test.ts)
+
+### 7.5 `Media Engine` 先做 registry/cache/playback plan，再接 DOM 控制
+
+适用问题：
+
+- 媒体生命周期不能继续散落在 Vue 组件里，否则 preload/release/play/pause/seek/mute 规则会分叉
+- 浏览器 DOM 媒体控制有副作用，直接一口气接 DOM 容易让 Runtime 状态机和渲染耦合
+
+实践方案：
+
+- 新增 `media/mediaEngine.ts`，先做纯状态层：
+  - `collectMediaRegistry()`：收集 image/video/audio/math 媒体元素
+  - `createMediaEngineState()`：建立 registry
+  - `syncMediaEngine()`：按 active slide 维护 current/previous/next 缓存窗口，远页标记 released
+  - `getMediaPlaybackPlan()`：根据 runtime state 输出 video/audio 的 play/pause/mute/rate/seek 计划
+- `createPresentationRuntime()` 持有 `runtime.media`，跳页和 transition tick 后同步 media engine
+- `evaluatePresentationFrame()` 输出 slide-level `media` frames，给后续 `MediaRenderer` 或 DOM sync 层消费
+
+代码落点：
+
+- [src/runtime/media/mediaEngine.ts](/Applications/work/ppt-preview/src/runtime/media/mediaEngine.ts)
+- [src/runtime/media/mediaEngine.test.ts](/Applications/work/ppt-preview/src/runtime/media/mediaEngine.test.ts)
+- [src/runtime/createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts)
+- [src/runtime/evaluatePresentationFrame.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.ts)
+- [src/runtime/evaluatePresentationFrame.test.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.test.ts)
+
+仍未完成：
+
+- 实际 DOM `HTMLMediaElement` play/pause/seek/mute 同步
+- media load error fallback
+- poster/首帧策略
+- 大媒体懒加载和 object URL 更细粒度释放
+
+### 7.6 `Input Engine` 先做 command mapping，UI 只负责事件采集和执行
+
+适用问题：
+
+- 键盘、舞台点击、触摸滑动如果直接写在 Vue 组件里，后续快捷键规则会散落并难以测试
+- Runtime facade 不应该直接依赖 DOM `KeyboardEvent / TouchEvent`，否则状态机单测会变复杂
+
+实践方案：
+
+- 新增 `input/inputEngine.ts`，先做纯映射层：
+  - keyboard：左右翻页、Enter 前进、Space 播放/暂停、F 全屏、P 演讲者模式、Esc 退出全屏
+  - pointer：主键点击舞台触发 `advance`
+  - touch：水平滑动触发前后翻页，忽略 tap 和纵向滚动
+- 对 editable target 与 ctrl/meta/alt 组合键直接返回 `none`，避免劫持输入框和浏览器/系统快捷键
+- `PresentationShell.vue` 负责监听全局 keydown 并执行 command；`PresentationStage.vue` 只采集舞台点击和触摸起止点
+
+代码落点：
+
+- [src/runtime/input/inputEngine.ts](/Applications/work/ppt-preview/src/runtime/input/inputEngine.ts)
+- [src/runtime/input/inputEngine.test.ts](/Applications/work/ppt-preview/src/runtime/input/inputEngine.test.ts)
+- [src/components/presentation/PresentationShell.vue](/Applications/work/ppt-preview/src/components/presentation/PresentationShell.vue)
+- [src/components/presentation/PresentationStage.vue](/Applications/work/ppt-preview/src/components/presentation/PresentationStage.vue)
+
+仍未完成：
+
+- 可配置快捷键 schema
+- Presenter 专用快捷键扩展
+- 激光笔 / 标注模式输入路由
+- 触摸双指 / 长按等更复杂手势
