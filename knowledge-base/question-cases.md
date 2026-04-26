@@ -259,18 +259,22 @@
   - 点击“播放”后页面不会按预期自动翻页
 - 代表案例：
   - `演示文稿1.pptx` 全文档
-- 已覆盖基线：
+- 已覆盖基线:
   - `slide-transitions.ts` 已从 slide XML 读取 `p:transition` 的 `type / spd / advTm`
   - `textBodyInsets.ts` orchestration 已把 transition metadata 回填到 raw slide
   - `normalizePresentation` 已把 `transition.advanceAfterMs/advTm` 作为 autoplay fallback 归一化到 `slide.autoplay.advanceAfterMs`
   - `transitionViewportModel.ts` 已开始按 `fade / push / wipe` 派发不同的 viewport 中间态样式
   - 浏览器回归已确认 `演示文稿1.pptx` 第 2 页 push 中间态表现为 previous/current 双 viewport 水平推进
   - `createPresentationRuntime/evaluatePresentationFrame` 已补回归：翻页中的 transition duration/type 取 source slide，避免整份 deck 的转场类型与节奏整体错位一页
-- 仍未覆盖：
-  - 更复杂的转场方向参数
-  - wipe 的更系统视觉回归
-  - 对象级 entrance animation 解析；当前 `演示文稿1.pptx` 的 slide XML 只有 timing root，没有对象级 timing children，不能作为 entrance parser 回归样本
-- 代表测试：
+  - `PresentationStage/stageViewportModel` 已补回归：previous viewport 只在 `isTransitioning` 时渲染；`transitionViewportModel` 显式禁用 CSS 自己的额外插值，修掉转场结束后上一页残影/当前页回弹
+  - 已补 `transition.direction` 通路：slide XML enhancer -> raw slide -> normalizePresentation -> evaluatePresentationFrame -> SlideViewport；浏览器已用 `47e66b31f89d4b33b14c5010b92296c5.pptx` 复验 `push dir="u"` 垂直推进，且真实 XML 已确认 `slide2/6/7` 都带 `dir="u"`
+  - `wipe` 已补四向 `dir="r/l/u/d"` clip-path 派发；当前已新增真实样本 `wipe-directions-fixture.pptx`，浏览器中间态已逐个确认四向 reveal 与 frame.direction 一致
+  - 已新增 `fixtures/transition-regression-cases.md` + `public/transition-regression-harness.js`，把 `fade / push / wipe` 的真实 PPTX 中间态检查流程沉淀成可重复执行的浏览器回归资产
+  - 已补 `fixtures/transition-regression-baseline.json`，把当前确认过的 `frame.transition* + viewport clipPath/transform/opacity` 固定成结构化 baseline，后续改动可先做行为级 diff，再升级到截图 diff
+- 仍未覆盖:
+  - 更系统的视觉回归：虽然 `wipe-directions-fixture.pptx` 已完成真实 `dir` 行为核对，但还没做系统截图对照与 Office/WPS 中间态像素级比对
+  - 对象级 entrance animation 解析；当前 repo 中这份 `演示文稿1.pptx` 的二进制经复验，`slide2.xml` 只有 timing root，且 runtime model 五页 `animations.length === 0`，当前链路无法从该文件还原逐条淡入
+- 代表测试:
   - `src/adapters/pptxtojson/enhancers/slide-transitions.test.ts`
   - `src/adapters/pptxtojson/normalizePresentation.test.ts`
   - `src/components/presentation/transitionViewportModel.test.ts`

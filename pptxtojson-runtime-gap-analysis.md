@@ -232,14 +232,18 @@ Presentation Runtime Facade
 - transition 元数据
 - 通过 slide XML enhancer 回填 `advTm -> slide.autoplay.advanceAfterMs`
 - `transitionViewportModel.ts` 中针对 `fade / push / wipe` 的最小 typed viewport 中间态
+- `push` 已开始支持 `direction`，当前已用真实 `47e66b31f89d4b33b14c5010b92296c5.pptx` 复验 `dir="u"` 的垂直推进（XML 实际命中 `slide2/6/7` 的 `<p:push dir="u"/>`）
+- `wipe` 已支持 `direction`，当前最小 renderer 会按 `dir="r/l/u/d"` 派发四向 clip-path 揭示；仓库内已新增 `wipe-directions-fixture.pptx` 作为真实 `wipe dir` browser regression 样本
+- 已开始把真实转场回归流程系统化：新增 `fixtures/transition-regression-cases.md`、`fixtures/transition-regression-baseline.json` 与 `public/transition-regression-harness.js`，覆盖 `fade / push / wipe` 的固定 progress 中间态证据收集
 - `SlideViewport.vue` 中按 `transition.type` 派发对应的 opacity / translateX / clip-path 样式
 - Runtime / Evaluator 已修正 source-slide transition 语义：翻页中 current viewport 可是目标页内容，但 transition `type/duration` 必须继续取 source slide，不能错位一页
+- `PresentationStage` 已改为只在 transition active 时挂 previous viewport，且 viewport style 显式 `transition: none`，避免非转场态 residual DOM + CSS 插值造成拖尾
 
 但仍然没有形成完整的 Transition Engine renderer 分发系统。
 
 仍未系统支持：
 
-- push / wipe 的方向参数
+- wipe 的更系统视觉回归（方向虽已支持，但还没做真实页中间态对照）
 - cover
 - uncover
 - split

@@ -131,7 +131,7 @@ describe('evaluatePresentationFrame media output', () => {
       slides: [
         {
           ...slide('slide-1', []),
-          transition: { type: 'fade', durationMs: 800 },
+          transition: { type: 'fade', direction: 'u', durationMs: 800 },
         },
         {
           ...slide('slide-2', []),
@@ -151,5 +151,6 @@ describe('evaluatePresentationFrame media output', () => {
 
     expect(frame.currentSlideIndex).toBe(1)
     expect(frame.transitionType).toBe('fade')
+    expect(frame.transitionDirection).toBe('u')
   })
 })

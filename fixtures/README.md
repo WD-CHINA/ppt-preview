@@ -14,6 +14,8 @@
 
 表格类问题同时维护 [table-regression-cases.md](./table-regression-cases.md)：用合成测试锁住 `NormalizedTableMeta` 与 renderer helper 行为，用真实 PPTX 页面索引推进视觉回归。
 
+转场类真实视觉回归维护在 [transition-regression-cases.md](./transition-regression-cases.md)：记录固定 `transitionProgress` 下的真实 PPTX 中间态证据，并配套浏览器可直接 `import('/transition-regression-harness.js')` 的 harness [`public/transition-regression-harness.js`](/Applications/work/ppt-preview/public/transition-regression-harness.js)。当前还补了一份结构化基线 [`transition-regression-baseline.json`](./transition-regression-baseline.json)，先用 `frame + viewport styles` 守住行为，再逐步升级成截图/像素级对照。
+
 ## 使用约定
 
 每个 fixture 至少记录以下信息：

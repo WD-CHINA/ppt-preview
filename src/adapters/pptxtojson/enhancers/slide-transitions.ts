@@ -2,6 +2,7 @@ import type { RawPptxSlide } from '../types'
 
 export interface SlideTransitionMetadata {
   type?: string
+  direction?: string
   durationMs?: number
   advanceAfterMs?: number
 }
@@ -17,11 +18,13 @@ export function extractSlideTransitionMetadata(slideXml: string): SlideTransitio
   const innerXml = transitionMatch[2] ?? ''
   const typeMatch = innerXml.match(/<p:([a-zA-Z0-9]+)\b/)
   const type = typeMatch?.[1]
+  const direction = extractChildAttribute(innerXml, type, 'dir')
   const speed = extractAttribute(attributeSource, 'spd')
   const advanceAfterMs = parseOptionalNumber(extractAttribute(attributeSource, 'advTm'))
 
   return {
     type,
+    direction,
     durationMs: mapTransitionSpeedToDuration(speed),
     advanceAfterMs,
   }
@@ -35,6 +38,7 @@ export function applySlideTransitionMetadata(slide: RawPptxSlide, metadata: Slid
   slide.transition = {
     ...(slide.transition ?? {}),
     ...(metadata.type ? { type: metadata.type } : {}),
+    ...(metadata.direction ? { direction: metadata.direction } : {}),
     ...(metadata.durationMs != null ? { durationMs: metadata.durationMs } : {}),
     ...(metadata.advanceAfterMs != null ? { advanceAfterMs: metadata.advanceAfterMs } : {}),
   }
@@ -63,6 +67,15 @@ function mapTransitionSpeedToDuration(speed: string | null) {
 function extractAttribute(source: string, name: string) {
   const match = source.match(new RegExp(`${name}="([^"]+)"`))
   return match?.[1] ?? null
+}
+
+function extractChildAttribute(source: string, childTag: string | undefined, attributeName: string) {
+  if (!childTag) {
+    return undefined
+  }
+
+  const match = source.match(new RegExp(`<p:${childTag}\\b[^>]*${attributeName}="([^"]+)"`))
+  return match?.[1] ?? undefined
 }
 
 function parseOptionalNumber(value: string | null) {

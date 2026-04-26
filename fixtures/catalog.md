@@ -138,8 +138,8 @@
 重点页面：
 
 - 第 1 页：`fade` 转场，`advTm=6000`；已确认通过 slide XML enhancer 回填 `advanceAfterMs`
-- 第 2 页：`push` 转场，`advTm=6500`；已确认浏览器中间态能看到 previous/current 双 viewport 水平推进
-- 第 3 页：`wipe` 转场，`advTm=6500`；当前已补 typed transition style helper，但仍待更系统的视觉回归
+- 第 2 页：`push` 转场，`advTm=6500`；已确认浏览器中间态能看到 previous/current 双 viewport 水平推进；同时 repo 当前这份二进制复验未解析出对象级 animation（runtime model `animations.length === 0`）
+- 第 3 页：`wipe` 转场，`advTm=6500`；当前已补 typed transition style helper 与 `dir="r/l/u/d"` 四向 clip-path 支持，但仍待更系统的视觉回归
 - 运行时语义：翻页时应使用 source slide 的 `transition.type/duration`；否则会出现“每页转场都像慢一页/错位一页”的 off-by-one 错配
 - 全文档：未发现对象级 timing children，当前 XML 中只有 timing root；因此这份样本更适合作为“页面转场 + 自动播放”样本，而不是对象入场动画解析样本
 
@@ -151,8 +151,14 @@
 ## 10. `47e66b31f89d4b33b14c5010b92296c5.pptx`
 
 - 文件位置：[public/47e66b31f89d4b33b14c5010b92296c5.pptx](/Applications/work/ppt-preview/public/47e66b31f89d4b33b14c5010b92296c5.pptx)
-- 状态：`backlog`
-- 用途：媒体与 timing 样本
+- 状态：`partial`
+- 用途：媒体与 timing 样本，同时用于验证带 `dir` 的 `push` 转场
+- 已确认页面：
+  - `slide2.xml`：`<p:push dir="u"/>`
+  - `slide6.xml`：`<p:push dir="u"/>`
+  - `slide7.xml`：`<p:push dir="u"/>`
+- 浏览器回归：已确认 `slide2 -> slide3` 的 mid-transition 为双 viewport，上一页向下退出、下一页自上方进入，符合 `dir="u"` 的垂直推进
+- 边界：当前仓库内仍缺少带 `dir` 的真实 `wipe` fixture，因此 `wipe r/l/u/d` 仍主要由纯函数测试覆盖
 
 标签：
 
@@ -161,6 +167,28 @@
 - `timing`
 - `transition`
 - `media-sync`
+
+## 11. `wipe-directions-fixture.pptx`
+
+- 文件位置：[public/wipe-directions-fixture.pptx](/Applications/work/ppt-preview/public/wipe-directions-fixture.pptx)
+- 状态：`active`
+- 用途：真实 `wipe dir` 浏览器回归样本；由 `演示文稿1.pptx` 衍生，专门用于验证 `r/l/u/d` 四向 clip-path 渲染
+- 已确认页面：
+  - `slide1.xml`：`<p:wipe dir="r"/>`
+  - `slide2.xml`：`<p:wipe dir="l"/>`
+  - `slide3.xml`：`<p:wipe dir="u"/>`
+  - `slide4.xml`：`<p:wipe dir="d"/>`
+- 浏览器回归：
+  - `slide1 -> slide2`：`clipPath = inset(0 44% 0 0)`，从左向右揭示
+  - `slide2 -> slide3`：`clipPath = inset(0 0 0 42%)`，从右向左揭示
+  - `slide3 -> slide4`：`clipPath = inset(33% 0 0 0)`，从下向上揭示
+  - `slide4 -> slide5`：`clipPath = inset(0 0 35% 0)`，从上向下揭示
+- 边界：当前已完成真实页 `dir` 行为核对，但仍未做系统截图对照与 Office/WPS 中间态像素级比对
+
+标签：
+
+- `transition`
+- `timing`
 
 ## 9. `math_probability_statistics_formulas.pptx`
 

@@ -14,6 +14,7 @@ describe('slide transition enhancer', () => {
 
     expect(metadata).toEqual({
       type: 'push',
+      direction: 'r',
       durationMs: 800,
       advanceAfterMs: 6500,
     })
@@ -27,11 +28,12 @@ describe('slide transition enhancer', () => {
 
     applySlideTransitionMetadata(slide, {
       type: 'wipe',
+      direction: 'l',
       durationMs: 800,
       advanceAfterMs: 6500,
     })
 
-    expect(slide.transition).toEqual({ type: 'wipe', durationMs: 800, advanceAfterMs: 6500 })
+    expect(slide.transition).toEqual({ type: 'wipe', direction: 'l', durationMs: 800, advanceAfterMs: 6500 })
     expect(slide.autoplay).toEqual({ advanceOnClick: true, advanceAfterMs: 6500 })
   })
 })

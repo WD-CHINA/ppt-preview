@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "updated_from": "browser_console harness runs",
+  "cases": [
+    {
+      "caseId": "fade-default",
+      "fileName": "演示文稿1.pptx",
+      "sourceSlideIndex": 0,
+      "prepareMode": "mutateState",
+      "tickMs": 400,
+      "frame": {
+        "currentSlideIndex": 1,
+        "isTransitioning": true,
+        "transitionType": "fade",
+        "transitionProgress": 0.687
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "0.312625",
+          "transform": "matrix(0.986252, 0, 0, 0.986252, 0, 0)"
+        },
+        {
+          "role": "current",
+          "clipPath": "none",
+          "opacity": "0.687375",
+          "transform": "matrix(1, 0, 0, 1, 0, 5.62725)"
+        }
+      ]
+    },
+    {
+      "caseId": "push-up-real",
+      "fileName": "47e66b31f89d4b33b14c5010b92296c5.pptx",
+      "sourceSlideIndex": 1,
+      "prepareMode": "goToSlide",
+      "tickMs": 600,
+      "frame": {
+        "currentSlideIndex": 2,
+        "isTransitioning": true,
+        "transitionType": "push",
+        "transitionDirection": "u",
+        "transitionProgress": 0.528
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "matrix(1, 0, 0, 1, 0, 380.04)"
+        },
+        {
+          "role": "current",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "matrix(1, 0, 0, 1, 0, -339.96)"
+        }
+      ]
+    },
+    {
+      "caseId": "wipe-right-real",
+      "fileName": "wipe-directions-fixture.pptx",
+      "sourceSlideIndex": 0,
+      "prepareMode": "goToSlide",
+      "tickMs": 400,
+      "frame": {
+        "currentSlideIndex": 1,
+        "isTransitioning": true,
+        "transitionType": "wipe",
+        "transitionDirection": "r",
+        "transitionProgress": 0.563
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "none"
+        },
+        {
+          "role": "current",
+          "clipPath": "inset(0px 44% 0px 0px)",
+          "opacity": "1",
+          "transform": "none"
+        }
+      ]
+    },
+    {
+      "caseId": "wipe-left-real",
+      "fileName": "wipe-directions-fixture.pptx",
+      "sourceSlideIndex": 1,
+      "prepareMode": "mutateState",
+      "tickMs": 400,
+      "frame": {
+        "currentSlideIndex": 2,
+        "isTransitioning": true,
+        "transitionType": "wipe",
+        "transitionDirection": "l",
+        "transitionProgress": 0.584
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "none"
+        },
+        {
+          "role": "current",
+          "clipPath": "inset(0px 0px 0px 42%)",
+          "opacity": "1",
+          "transform": "none"
+        }
+      ]
+    },
+    {
+      "caseId": "wipe-up-real",
+      "fileName": "wipe-directions-fixture.pptx",
+      "sourceSlideIndex": 2,
+      "prepareMode": "mutateState",
+      "tickMs": 400,
+      "frame": {
+        "currentSlideIndex": 3,
+        "isTransitioning": true,
+        "transitionType": "wipe",
+        "transitionDirection": "u",
+        "transitionProgress": 0.667
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "none"
+        },
+        {
+          "role": "current",
+          "clipPath": "inset(33% 0px 0px 0px)",
+          "opacity": "1",
+          "transform": "none"
+        }
+      ]
+    },
+    {
+      "caseId": "wipe-down-real",
+      "fileName": "wipe-directions-fixture.pptx",
+      "sourceSlideIndex": 3,
+      "prepareMode": "mutateState",
+      "tickMs": 400,
+      "frame": {
+        "currentSlideIndex": 4,
+        "isTransitioning": true,
+        "transitionType": "wipe",
+        "transitionDirection": "d",
+        "transitionProgress": 0.646
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "none"
+        },
+        {
+          "role": "current",
+          "clipPath": "inset(0px 0px 35% 0px)",
+          "opacity": "1",
+          "transform": "none"
+        }
+      ]
+    }
+  ]
+}

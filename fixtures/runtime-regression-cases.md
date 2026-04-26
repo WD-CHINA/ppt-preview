@@ -18,6 +18,9 @@
   - `Timeline Engine` 的最小 `motionPath` 几何计算（`translateX / translateY / rotate / progress`）
   - `Transition Engine` 的 transition start / progress / finish 状态写入
   - Runtime / Evaluator 对转场元数据的归属语义：翻到下一页时，duration/type 应取 source slide，而不是 destination slide
+  - `PresentationStage` 只在 `frame.isTransitioning` 时渲染 previous viewport，避免非转场态残留上一页 DOM
+  - `transitionViewportModel` 在转场中与转场结束后都显式输出 `transition: none`，避免 CSS 自己再补一次插值造成重影/拖尾
+  - `transitionViewportModel` 对 `wipe` 已锁住 `dir="r/l/u/d"` 四向 clip-path regression，避免 direction 元数据只在 parser 存在、但 Vue renderer 继续按单向 reveal 渲染
   - `Media Engine` 的 registry、当前/前后页缓存窗口、远页 release、play/pause/mute/seek 计划
   - `Evaluator` 输出 slide-level media frames，给后续 MediaRenderer/DOM sync 留接口
   - `Evaluator` 把 `motionPath` 投影到 `EvaluatedElementFrame.bounds` 与 `animationGeometry`，给 line/connector 后续高保真渲染留稳定接口

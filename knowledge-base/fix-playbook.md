@@ -465,6 +465,7 @@ pnpm build
 
 - 新增 `enhancers/slide-transitions.ts`，直接从 slide XML 读取 `p:transition`：
   - 子节点类型（如 `fade / push / wipe`）
+  - `dir`
   - `spd`
   - `advTm`
 - 在 `textBodyInsets.ts` orchestration 里把 transition metadata 回填到 raw slide；再由 `normalizePresentation.ts` 把 `transition.advanceAfterMs/advTm` 归一化到 `slide.autoplay.advanceAfterMs`
@@ -472,6 +473,11 @@ pnpm build
   - `fade`：延续当前 crossfade
   - `push`：previous/current 双 viewport 水平推进
   - `wipe`：current viewport 用 `clip-path` 逐步揭示
+- 后续补 `push`/`wipe` 方向时，不要只在 helper 里硬编码；要把 `direction` 从 slide XML 一路带到 runtime frame：`slide-transitions.ts -> RawPptxSlide.transition.direction -> normalizePresentation -> evaluatePresentationFrame -> stageViewportModel -> SlideViewport`
+- `push` 当前已支持 `r/l/u/d` 四向 previous/current 位移；`wipe` 当前已支持 `r/l/u/d` 四向 clip-path 揭示，先锁纯函数测试，再做真实页视觉回归
+- 真实样本要区分两件事：`47e66b31f89d4b33b14c5010b92296c5.pptx` 已能验证 `push dir="u"`；`wipe` 则建议直接从现有小 deck 派生一个真实 fixture（如把 `演示文稿1.pptx` 的前四页 transition 改成 `wipe dir="r/l/u/d"`），再用浏览器逐页卡 mid-transition 检查 `frame.transitionDirection` 与 `.viewport` 的 `clipPath` 是否一致。这样可以把“纯函数四向测试”补成“真实 PPTX 四向回归”
+- 为了避免每次都手写一大段 `browser_console` 表达式，建议把这套流程沉淀成 repo 内可复用 harness（如 `public/transition-regression-harness.js`），并把固定 case 与预期结果记入 `fixtures/transition-regression-cases.md`。后续只要换 fixture / sourceSlideIndex / tickMs，就能重复收集 `frame + viewport styles` 证据。
+- 如果暂时还没有像素级截图对照，也先不要空着。至少落一份结构化 baseline（如 `fixtures/transition-regression-baseline.json`），把 `frame.transitionType / transitionDirection / transitionProgress` 与 viewport 的 `clipPath / transform / opacity` 固定下来；这样后续任何改动都能先做行为级 diff，再决定是否需要重新采集视觉基线。
 - 先把页面转场与 autoplay 节奏跑通；对象级 entrance animation 解析另行处理，不和这一刀混写
 
 代码落点：
@@ -532,6 +538,27 @@ pnpm build
 - [src/runtime/transition/transitionEngine.ts](/Applications/work/ppt-preview/src/runtime/transition/transitionEngine.ts)
 - [src/runtime/evaluatePresentationFrame.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.ts)
 - [src/runtime/evaluatePresentationFrame.test.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.test.ts)
+
+### 7.4b Transition 渲染层不要在非转场态保留 previous viewport，也不要让 CSS 再做第二次插值
+
+适用问题：
+
+- 转场结束后还能看到上一页残影、当前页 opacity/transform 没有立刻回到最终态
+- 浏览器里 `.viewport` 数量在非转场态仍为 2，或 computed style 仍残留上一轮 transition 的 opacity/transform
+
+实践方案：
+
+- 抽 `stageViewportModel.ts` 纯函数：只有 `frame.isTransitioning` 时才返回 previous viewport descriptor；平时只渲染 current viewport
+- 给 viewport descriptor 加稳定 key，避免 previous/current 组件实例跨角色复用
+- `transitionViewportModel.ts` 对转场中和转场结束后的 viewport 都显式输出 `transition: none`，让 runtime 的 `transitionProgress` 成为唯一插值来源，不再叠加 `.viewport` CSS transition
+
+代码落点：
+
+- [src/components/presentation/stageViewportModel.ts](/Applications/work/ppt-preview/src/components/presentation/stageViewportModel.ts)
+- [src/components/presentation/stageViewportModel.test.ts](/Applications/work/ppt-preview/src/components/presentation/stageViewportModel.test.ts)
+- [src/components/presentation/PresentationStage.vue](/Applications/work/ppt-preview/src/components/presentation/PresentationStage.vue)
+- [src/components/presentation/transitionViewportModel.ts](/Applications/work/ppt-preview/src/components/presentation/transitionViewportModel.ts)
+- [src/components/presentation/transitionViewportModel.test.ts](/Applications/work/ppt-preview/src/components/presentation/transitionViewportModel.test.ts)
 
 ### 7.5 `Media Engine` 先做 registry/cache/playback plan，再接 DOM 控制
 

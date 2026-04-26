@@ -6,6 +6,7 @@ describe('transitionViewportModel', () => {
     expect(getTransitionViewportStyle({ transitionType: 'fade', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
       opacity: 0.25,
       transform: 'translateY(13.5px)',
+      transition: 'none',
     })
   })
 
@@ -20,15 +21,42 @@ describe('transitionViewportModel', () => {
     })
   })
 
+  it('supports directional push transitions', () => {
+    expect(getTransitionViewportStyle({ transitionType: 'push', transitionDirection: 'l', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      transform: 'translateX(-960px)',
+    })
+    expect(getTransitionViewportStyle({ transitionType: 'push', transitionDirection: 'd', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      transform: 'translateY(540px)',
+    })
+    expect(getTransitionViewportStyle({ transitionType: 'push', transitionDirection: 'u', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      transform: 'translateY(180px)',
+    })
+  })
+
   it('reveals wipe transitions using clip-path instead of moving the previous slide', () => {
     expect(getTransitionViewportStyle({ transitionType: 'wipe', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
       opacity: 1,
       clipPath: 'inset(0 75% 0 0)',
       transform: 'none',
     })
+    expect(getTransitionViewportStyle({ transitionType: 'wipe', transitionDirection: 'l', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      clipPath: 'inset(0 0 0 75%)',
+    })
+    expect(getTransitionViewportStyle({ transitionType: 'wipe', transitionDirection: 'u', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      clipPath: 'inset(75% 0 0 0)',
+    })
+    expect(getTransitionViewportStyle({ transitionType: 'wipe', transitionDirection: 'd', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      clipPath: 'inset(0 0 75% 0)',
+    })
     expect(getTransitionViewportStyle({ transitionType: 'wipe', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
       opacity: 1,
       transform: 'none',
+    })
+  })
+
+  it('disables CSS interpolation even after transition ends', () => {
+    expect(getTransitionViewportStyle({ width: 1280, height: 720 })).toMatchObject({
+      transition: 'none',
     })
   })
 })

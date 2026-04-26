@@ -25,6 +25,7 @@ export interface SlideBackground {
 
 export interface SlideTransitionMeta {
   type: string
+  direction?: string
   durationMs: number
 }
 
@@ -236,6 +237,7 @@ export interface PresentationFrame {
   isTransitioning: boolean
   transitionProgress: number
   transitionType?: string
+  transitionDirection?: string
   current?: EvaluatedSlideFrame
   previous?: EvaluatedSlideFrame
   next?: EvaluatedSlideFrame

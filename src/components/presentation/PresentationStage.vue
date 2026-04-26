@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue'
 import SlideViewport from './SlideViewport.vue'
+import { getStageViewportDescriptors } from './stageViewportModel'
 import type { TouchInputDescriptor } from '../../runtime/input/inputEngine'
 import type { PresentationFrame } from '../../types/presentation'
 
@@ -31,6 +32,8 @@ const canvasStyle = computed(() => {
     transform: `scale(${scale})`,
   }
 })
+
+const viewportDescriptors = computed(() => getStageViewportDescriptors(props.frame))
 
 function handleMouseUp(event: MouseEvent) {
   emit('stageClick', event)
@@ -90,23 +93,16 @@ onBeforeUnmount(() => {
     <div ref="stage" class="stage" :style="stageStyle">
       <div class="stage-canvas" :style="canvasStyle">
         <SlideViewport
-          v-if="props.frame.previous"
-          :slide="props.frame.previous"
+          v-for="descriptor in viewportDescriptors"
+          :key="descriptor.key"
+          :slide="descriptor.slide"
           :width="props.frame.width"
           :height="props.frame.height"
-          :transition-progress="props.frame.transitionProgress"
-          :transition-type="props.frame.transitionType"
-          transition-role="previous"
-        />
-
-        <SlideViewport
-          :slide="props.frame.current"
-          :width="props.frame.width"
-          :height="props.frame.height"
-          active
-          :transition-progress="props.frame.isTransitioning ? props.frame.transitionProgress : 1"
-          :transition-type="props.frame.transitionType"
-          :transition-role="props.frame.isTransitioning ? 'current' : undefined"
+          :active="descriptor.active"
+          :transition-progress="descriptor.transitionProgress"
+          :transition-type="descriptor.transitionType"
+          :transition-direction="descriptor.transitionDirection"
+          :transition-role="descriptor.transitionRole"
         />
       </div>
     </div>

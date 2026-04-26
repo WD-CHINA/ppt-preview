@@ -279,6 +279,7 @@ function normalizeTransition(rawTransition: RawPptxSlide['transition']): SlideTr
 
   return {
     type: rawTransition.type ?? 'fade',
+    ...(typeof rawTransition.direction === 'string' ? { direction: rawTransition.direction } : {}),
     durationMs: normalizeNumber(rawTransition.durationMs ?? rawTransition.duration, 400),
   }
 }

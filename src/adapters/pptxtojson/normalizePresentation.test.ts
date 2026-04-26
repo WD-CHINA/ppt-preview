@@ -136,6 +136,7 @@ describe('normalizePresentation motion-path animations', () => {
         {
           transition: {
             type: 'push',
+            direction: 'r',
             durationMs: 800,
             advTm: 6500,
           },
@@ -146,7 +147,7 @@ describe('normalizePresentation motion-path animations', () => {
 
     const slide = normalizePresentation(raw).slides[0]
 
-    expect(slide?.transition).toEqual({ type: 'push', durationMs: 800 })
+    expect(slide?.transition).toEqual({ type: 'push', direction: 'r', durationMs: 800 })
     expect(slide?.autoplay).toEqual({ advanceOnClick: true, advanceAfterMs: 6500 })
   })
 })
