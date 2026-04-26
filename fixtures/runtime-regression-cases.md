@@ -17,7 +17,7 @@
   - `Timeline Engine` 的 click trigger 计数、自动动画序列和基础 visibility/opacity 计算
   - `Timeline Engine` 的最小 `motionPath` 几何计算（`translateX / translateY / rotate / progress`）
   - `Transition Engine` 的 transition start / progress / finish 状态写入
-  - Runtime / Evaluator 对转场元数据的归属语义：翻到下一页时，duration/type 应取 source slide，而不是 destination slide
+  - Runtime / Evaluator 对转场元数据的归属语义：翻到下一页时，duration/type 应取 destination slide；这一点已通过 `演示文稿1.pptx` 的 WPS 对照复验（`slide1 -> slide2` 更像 `push`，`slide3 -> slide4` 更像 `fade`）
   - `PresentationStage` 只在 `frame.isTransitioning` 时渲染 previous viewport，避免非转场态残留上一页 DOM
   - `transitionViewportModel` 在转场中与转场结束后都显式输出 `transition: none`，避免 CSS 自己再补一次插值造成重影/拖尾
   - `transitionViewportModel` 对 `wipe` 已锁住 `dir="r/l/u/d"` 四向 clip-path regression，避免 direction 元数据只在 parser 存在、但 Vue renderer 继续按单向 reveal 渲染

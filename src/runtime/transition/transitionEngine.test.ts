@@ -20,14 +20,18 @@ const model = {
   height: 720,
   theme: { colors: {} },
   usedFonts: [],
-  slides: [makeSlide(400), makeSlide()],
+  slides: [makeSlide(), makeSlide(400)],
 }
 
 describe('transition engine', () => {
-  it('starts a transition when the source slide has a positive duration', () => {
+  it('starts a transition when the destination slide has a positive duration', () => {
     const state = createSessionStore(model)
 
-    const started = beginSlideTransition(state, { fromIndex: 0, toIndex: 1, fromSlide: model.slides[0] })
+    const started = beginSlideTransition(state, {
+      fromIndex: 0,
+      toIndex: 1,
+      transitionSlide: model.slides[1],
+    })
 
     expect(started).toBe(true)
     expect(state.transitionFromSlideIndex).toBe(0)
@@ -36,10 +40,10 @@ describe('transition engine', () => {
     expect(state.sessionStatus).toBe('transitioning')
   })
 
-  it('does not start a transition when duration is absent or zero', () => {
+  it('does not start a transition when destination duration is absent or zero', () => {
     const state = createSessionStore(model)
 
-    const started = beginSlideTransition(state, { fromIndex: 1, toIndex: 0, fromSlide: model.slides[1] })
+    const started = beginSlideTransition(state, { fromIndex: 1, toIndex: 0, transitionSlide: model.slides[0] })
 
     expect(started).toBe(false)
     expect(state.transitionFromSlideIndex).toBeNull()
@@ -49,13 +53,13 @@ describe('transition engine', () => {
 
   it('advances transition progress by playback-scaled delta and finishes cleanly', () => {
     const state = createSessionStore(model)
-    beginSlideTransition(state, { fromIndex: 0, toIndex: 1, fromSlide: model.slides[0] })
+    beginSlideTransition(state, { fromIndex: 0, toIndex: 1, transitionSlide: model.slides[1] })
 
-    const firstTick = tickSlideTransition(state, model.slides[0], 100)
+    const firstTick = tickSlideTransition(state, model.slides[1], 100)
     expect(firstTick).toEqual({ status: 'running' })
     expect(state.transitionProgress).toBeCloseTo(0.25)
 
-    const finalTick = tickSlideTransition(state, model.slides[0], 400)
+    const finalTick = tickSlideTransition(state, model.slides[1], 400)
     expect(finalTick).toEqual({ status: 'finished' })
     expect(state.transitionProgress).toBe(1)
     expect(state.transitionFromSlideIndex).toBeNull()

@@ -18,7 +18,7 @@ export function evaluatePresentationFrame(
 ): PresentationFrame {
   const isTransitioning = state.transitionToSlideIndex != null
   const currentSlideIndex = isTransitioning ? (state.transitionToSlideIndex ?? state.activeSlideIndex) : state.activeSlideIndex
-  const transitionSlide = isTransitioning ? model.slides[state.transitionFromSlideIndex ?? currentSlideIndex] : undefined
+  const transitionSlide = isTransitioning ? model.slides[state.transitionToSlideIndex ?? currentSlideIndex] : undefined
 
   return {
     width: model.width,

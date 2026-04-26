@@ -3,16 +3,16 @@ import type { NormalizedSlide, PresentationRuntimeState } from '../../types/pres
 export interface BeginSlideTransitionInput {
   fromIndex: number
   toIndex: number
-  fromSlide?: NormalizedSlide
+  transitionSlide?: NormalizedSlide
 }
 
 export type TransitionTickResult = { status: 'idle' } | { status: 'running' } | { status: 'finished' }
 
 export function beginSlideTransition(
   state: PresentationRuntimeState,
-  { fromIndex, toIndex, fromSlide }: BeginSlideTransitionInput,
+  { fromIndex, toIndex, transitionSlide }: BeginSlideTransitionInput,
 ) {
-  const durationMs = getSlideTransitionDurationMs(fromSlide)
+  const durationMs = getSlideTransitionDurationMs(transitionSlide)
 
   if (durationMs <= 0) {
     state.transitionFromSlideIndex = null

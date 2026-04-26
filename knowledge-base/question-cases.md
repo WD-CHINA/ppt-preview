@@ -264,16 +264,18 @@
   - `textBodyInsets.ts` orchestration 已把 transition metadata 回填到 raw slide
   - `normalizePresentation` 已把 `transition.advanceAfterMs/advTm` 作为 autoplay fallback 归一化到 `slide.autoplay.advanceAfterMs`
   - `transitionViewportModel.ts` 已开始按 `fade / push / wipe` 派发不同的 viewport 中间态样式
-  - 浏览器回归已确认 `演示文稿1.pptx` 第 2 页 push 中间态表现为 previous/current 双 viewport 水平推进
-  - `createPresentationRuntime/evaluatePresentationFrame` 已补回归：翻页中的 transition duration/type 取 source slide，避免整份 deck 的转场类型与节奏整体错位一页
-  - `PresentationStage/stageViewportModel` 已补回归：previous viewport 只在 `isTransitioning` 时渲染；`transitionViewportModel` 显式禁用 CSS 自己的额外插值，修掉转场结束后上一页残影/当前页回弹
+- 浏览器回归已确认 `演示文稿1.pptx` 在 destination-slide 语义下与 WPS 更接近：`slide1 -> slide2` 的 mid-transition 为 previous/current 双 viewport 水平推进（对应目标页 `push`），`slide3 -> slide4` 则应按目标页 `fade` 处理而不是继续按 source 页 `wipe`
+- `createPresentationRuntime/evaluatePresentationFrame` 已补回归：翻页中的 transition duration/type 改为取 destination slide，修正 WPS 对照下“整份 deck 都慢一页/错位一页”的问题；`transitionFromSlideIndex` 仅保留给 previous viewport 内容来源
+
   - 已补 `transition.direction` 通路：slide XML enhancer -> raw slide -> normalizePresentation -> evaluatePresentationFrame -> SlideViewport；浏览器已用 `47e66b31f89d4b33b14c5010b92296c5.pptx` 复验 `push dir="u"` 垂直推进，且真实 XML 已确认 `slide2/6/7` 都带 `dir="u"`
   - `wipe` 已补四向 `dir="r/l/u/d"` clip-path 派发；当前已新增真实样本 `wipe-directions-fixture.pptx`，浏览器中间态已逐个确认四向 reveal 与 frame.direction 一致
   - 已新增 `fixtures/transition-regression-cases.md` + `public/transition-regression-harness.js`，把 `fade / push / wipe` 的真实 PPTX 中间态检查流程沉淀成可重复执行的浏览器回归资产
   - 已补 `fixtures/transition-regression-baseline.json`，把当前确认过的 `frame.transition* + viewport clipPath/transform/opacity` 固定成结构化 baseline，后续改动可先做行为级 diff，再升级到截图 diff
+- 已完成一轮真实 WPS 对照链路探测：macOS 权限打开后，可用 `osascript + screencapture + ffmpeg(avfoundation)` 录制 WPS 放映；实测 `演示文稿1.pptx` 的 WPS 放映帧与浏览器 runtime 存在可复验差异
 - 仍未覆盖:
   - 更系统的视觉回归：虽然 `wipe-directions-fixture.pptx` 已完成真实 `dir` 行为核对，但还没做系统截图对照与 Office/WPS 中间态像素级比对
-  - 对象级 entrance animation 解析；当前 repo 中这份 `演示文稿1.pptx` 的二进制经复验，`slide2.xml` 只有 timing root，且 runtime model 五页 `animations.length === 0`，当前链路无法从该文件还原逐条淡入
+  - 对象级 entrance animation 解析；当前 repo 中这份 `演示文稿1.pptx` 的二进制经复验，`slide2.xml` 只有 timing root，且 runtime model 五页 `animations.length === 0`。同时上游 `pptxtojson@2.0.2` 源码当前只实现了 `p:transition` 解析，没有对象级 timing/build parser。也就是说：现阶段不仅这份样本没被当前链路读出对象动画，连解析器能力本身也缺这一层。但本轮已补最小 timing parser（`enhancers/slide-animations.ts`），现可从 `p:timing` 中提取 `clickEffect / withEffect / afterEffect` 到 `slide.animations`，并已在真实 `47e66b31...pptx` 中复验出多页 click-triggered animation。它仍然不足以解释 `演示文稿1.pptx` 第二张的“逐条出现”感知，因此不能再把“XML 当前没读到对象动画”直接等同于“文件里肯定没有对象动画”
+  - `演示文稿1.pptx` 的 slide3 -> slide4：此前浏览器 runtime 被固定在 `transitionFromSlideIndex=2 / transitionProgress≈0.58` 时，会错误按 source 页渲染成 `wipe`（current viewport `clipPath = inset(0px 42% 0px 0px)`）；现已改为按 destination 页 `fade` 读取转场元数据。后续仍需继续看它与 WPS 的像素级细节是否完全贴合
 - 代表测试:
   - `src/adapters/pptxtojson/enhancers/slide-transitions.test.ts`
   - `src/adapters/pptxtojson/normalizePresentation.test.ts`

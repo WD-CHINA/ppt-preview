@@ -144,6 +144,7 @@ export interface NormalizedAnimation {
   trigger: 'withPrevious' | 'afterPrevious' | 'onClick'
   durationMs: number
   targetElementIds: string[]
+  targetParagraphIndex?: number
   effect: 'appear' | 'fade'
   motionPath?: NormalizedMotionPath
 }

@@ -1,9 +1,9 @@
 {
-  "version": 1,
-  "updated_from": "browser_console harness runs",
+  "version": 2,
+  "updated_from": "browser_console harness runs after WPS-aligned destination-slide transition fix",
   "cases": [
     {
-      "caseId": "fade-default",
+      "caseId": "push-default-real",
       "fileName": "演示文稿1.pptx",
       "sourceSlideIndex": 0,
       "prepareMode": "mutateState",
@@ -11,21 +11,75 @@
       "frame": {
         "currentSlideIndex": 1,
         "isTransitioning": true,
-        "transitionType": "fade",
-        "transitionProgress": 0.687
+        "transitionType": "push",
+        "transitionProgress": 0.583
       },
       "viewports": [
         {
           "role": "previous",
           "clipPath": "none",
-          "opacity": "0.312625",
-          "transform": "matrix(0.986252, 0, 0, 0.986252, 0, 0)"
+          "opacity": "1",
+          "transform": "matrix(1, 0, 0, 1, -746.72, 0)"
         },
         {
           "role": "current",
           "clipPath": "none",
-          "opacity": "0.687375",
-          "transform": "matrix(1, 0, 0, 1, 0, 5.62725)"
+          "opacity": "1",
+          "transform": "matrix(1, 0, 0, 1, 533.28, 0)"
+        }
+      ]
+    },
+    {
+      "caseId": "wipe-story-path-real",
+      "fileName": "演示文稿1.pptx",
+      "sourceSlideIndex": 1,
+      "prepareMode": "mutateState",
+      "tickMs": 400,
+      "frame": {
+        "currentSlideIndex": 2,
+        "isTransitioning": true,
+        "transitionType": "wipe",
+        "transitionProgress": 0.646
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "none"
+        },
+        {
+          "role": "current",
+          "clipPath": "inset(0px 35% 0px 0px)",
+          "opacity": "1",
+          "transform": "none"
+        }
+      ]
+    },
+    {
+      "caseId": "fade-key-moment-real",
+      "fileName": "演示文稿1.pptx",
+      "sourceSlideIndex": 2,
+      "prepareMode": "mutateState",
+      "tickMs": 400,
+      "frame": {
+        "currentSlideIndex": 3,
+        "isTransitioning": true,
+        "transitionType": "fade",
+        "transitionProgress": 0.562
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "0.437625",
+          "transform": "matrix(0.988752, 0, 0, 0.988752, 0, 0)"
+        },
+        {
+          "role": "current",
+          "clipPath": "none",
+          "opacity": "0.562375",
+          "transform": "matrix(1, 0, 0, 1, 0, 7.87725)"
         }
       ]
     },

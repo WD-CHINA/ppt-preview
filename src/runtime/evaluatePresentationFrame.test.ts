@@ -122,7 +122,7 @@ describe('evaluatePresentationFrame media output', () => {
     })
   })
 
-  it('uses the source slide transition metadata while transitioning into the next slide', () => {
+  it('uses the destination slide transition metadata while transitioning into the next slide', () => {
     const transitionModel: NormalizedPresentation = {
       width: 1280,
       height: 720,
@@ -135,7 +135,7 @@ describe('evaluatePresentationFrame media output', () => {
         },
         {
           ...slide('slide-2', []),
-          transition: { type: 'push', durationMs: 800 },
+          transition: { type: 'push', direction: 'r', durationMs: 800 },
         },
       ],
     }
@@ -150,7 +150,7 @@ describe('evaluatePresentationFrame media output', () => {
     })
 
     expect(frame.currentSlideIndex).toBe(1)
-    expect(frame.transitionType).toBe('fade')
-    expect(frame.transitionDirection).toBe('u')
+    expect(frame.transitionType).toBe('push')
+    expect(frame.transitionDirection).toBe('r')
   })
 })

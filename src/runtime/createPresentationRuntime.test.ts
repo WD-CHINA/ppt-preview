@@ -34,7 +34,7 @@ function makeModel(): NormalizedPresentation {
     height: 720,
     theme: { colors: {} },
     usedFonts: [],
-    slides: [makeSlide('slide-1', 400), makeSlide('slide-2', 400), makeSlide('slide-3')],
+    slides: [makeSlide('slide-1', 400), makeSlide('slide-2', 400), makeSlide('slide-3', 400)],
   }
 }
 
@@ -49,7 +49,7 @@ function makeMediaModel(): NormalizedPresentation {
 }
 
 describe('presentation runtime facade', () => {
-  it('uses the source slide transition timing when moving to the next slide', () => {
+  it('uses the destination slide transition timing when moving to the next slide', () => {
     const model: NormalizedPresentation = {
       width: 1280,
       height: 720,
@@ -63,12 +63,12 @@ describe('presentation runtime facade', () => {
     const runtime = createPresentationRuntime(model)
 
     runtime.nextSlide()
-    runtime.tick(500)
+    runtime.tick(100)
 
     expect(runtime.state.sessionStatus).toBe('transitioning')
     expect(runtime.state.transitionProgress).toBeCloseTo(0.5, 5)
 
-    runtime.tick(500)
+    runtime.tick(100)
 
     expect(runtime.state.sessionStatus).toBe('playing')
     expect(runtime.state.transitionToSlideIndex).toBeNull()

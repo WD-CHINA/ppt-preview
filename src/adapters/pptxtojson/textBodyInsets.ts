@@ -1,5 +1,6 @@
 import JSZip from 'jszip'
 import type { RawPptxDocument } from './types'
+import { extractSlideAnimationMetadata, applySlideAnimationMetadata } from './enhancers/slide-animations'
 import { extractSlideLineMarkers, applyLineMarkers } from './enhancers/line-markers'
 import { correctEmbeddedMediaMimeTypes } from './enhancers/media-mime'
 import { extractSlideTransitionMetadata, applySlideTransitionMetadata } from './enhancers/slide-transitions'
@@ -27,6 +28,7 @@ export async function enrichTextBodyInsets(
       const textBodyInsets = extractSlideTextBodyInsets(slideXml)
       const lineMarkers = extractSlideLineMarkers(slideXml)
       const slideTransition = extractSlideTransitionMetadata(slideXml)
+      const slideAnimations = extractSlideAnimationMetadata(slideXml)
       const slideElements = [
         ...(Array.isArray(slide.layoutElements) ? slide.layoutElements : []),
         ...(Array.isArray(slide.elements) ? slide.elements : []),
@@ -35,6 +37,7 @@ export async function enrichTextBodyInsets(
       applyTextBodyInsets(slideElements, textBodyInsets)
       applyLineMarkers(slideElements, lineMarkers)
       applySlideTransitionMetadata(slide, slideTransition)
+      applySlideAnimationMetadata(slide, slideAnimations)
     }),
   )
 

@@ -225,6 +225,8 @@ Presentation Runtime Facade
 
 补充：在真实 `演示文稿1.pptx` 里，slide XML 的 `p:timing` 当前只有 timing root，没有对象级 timing children；因此它适合作为“页面转场 + 自动播放”回归样本，不适合作为对象入场动画解析样本。对象级 entrance animation 解析仍需另找包含 `anim/animEffect/seq` 等 timing children 的真实 PPTX。
 
+补充：但这条判断现在必须和真实 WPS 对照分开写。macOS 权限打开后，已经可以用 `osascript + screencapture + ffmpeg(avfoundation)` 直接录制 WPS 放映；该链路下，`演示文稿1.pptx` 仍会给出“第 2 张内容按顺序出现”“slide3 -> slide4 的视觉过渡不像当前浏览器里的固定 wipe 边界”这类用户可感知差异。当前更准确的说法应是：**当前 parser/runtime 没有从这份二进制里读出对象级动画，也还没把转场视觉还原对齐到 WPS；但不能再把它表述成‘文件本身没有这些效果’。** 另外，上游 `pptxtojson@2.0.2` 源码当前只实现了 `p:transition` 解析，没有对象级 timing/build parser，因此对象动画解析缺口不仅在这份样本，也在当前 parser 能力本身。当前仓库已经补了一个最小 timing parser 切片：可从 slide XML 的 `p:timing` 中提取 `clickEffect / withEffect / afterEffect`、`spTgt spid`、`cBhvr > cTn dur` 以及可选 `p:pRg st`，并注入 `slide.animations`；这足以覆盖 `47e66b31...pptx` 一类 click-triggered timing 样本，但距离完整 paragraph build / `bldLst` / Office 对象动画仍有明显差距。
+
 ### 3.3 Transition 只有简化过渡
 
 当前系统有：
@@ -236,7 +238,7 @@ Presentation Runtime Facade
 - `wipe` 已支持 `direction`，当前最小 renderer 会按 `dir="r/l/u/d"` 派发四向 clip-path 揭示；仓库内已新增 `wipe-directions-fixture.pptx` 作为真实 `wipe dir` browser regression 样本
 - 已开始把真实转场回归流程系统化：新增 `fixtures/transition-regression-cases.md`、`fixtures/transition-regression-baseline.json` 与 `public/transition-regression-harness.js`，覆盖 `fade / push / wipe` 的固定 progress 中间态证据收集
 - `SlideViewport.vue` 中按 `transition.type` 派发对应的 opacity / translateX / clip-path 样式
-- Runtime / Evaluator 已修正 source-slide transition 语义：翻页中 current viewport 可是目标页内容，但 transition `type/duration` 必须继续取 source slide，不能错位一页
+- Runtime / Evaluator 已按 WPS 对照修正为 destination-slide transition 语义：翻页中 current viewport 与 transition `type/duration/direction` 都取目标页；`transitionFromSlideIndex` 仅继续用于 previous viewport 内容来源。`演示文稿1.pptx` 下已复验：`slide1 -> slide2` 更接近 `push`，`slide3 -> slide4` 更接近 `fade`
 - `PresentationStage` 已改为只在 transition active 时挂 previous viewport，且 viewport style 显式 `transition: none`，避免非转场态 residual DOM + CSS 插值造成拖尾
 
 但仍然没有形成完整的 Transition Engine renderer 分发系统。

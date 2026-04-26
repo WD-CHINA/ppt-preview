@@ -896,6 +896,7 @@ function normalizeAnimation(
     trigger: normalizeAnimationTrigger(rawAnimation.trigger),
     durationMs: normalizeNumber(rawAnimation.durationMs ?? rawAnimation.duration, 350),
     targetElementIds,
+    ...(typeof rawAnimation.targetParagraphIndex === 'number' ? { targetParagraphIndex: rawAnimation.targetParagraphIndex } : {}),
     effect: rawAnimation.effect === 'appear' || rawAnimation.effect === 'fade' ? rawAnimation.effect : 'fade',
     motionPath: normalizeMotionPath(rawAnimation.motionPath),
   }

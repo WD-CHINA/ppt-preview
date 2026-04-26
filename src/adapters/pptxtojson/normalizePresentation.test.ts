@@ -75,6 +75,47 @@ describe('normalizePresentation table elements', () => {
 })
 
 describe('normalizePresentation motion-path animations', () => {
+  it('normalizes timing-derived element animations into the runtime animation model', () => {
+    const raw: RawPptxDocument = {
+      slides: [
+        {
+          elements: [
+            {
+              type: 'text',
+              id: '7',
+              left: 10,
+              top: 20,
+              width: 120,
+              height: 40,
+              text: 'Step 1',
+            },
+          ],
+          animations: [
+            {
+              id: 'build-1',
+              trigger: 'onClick',
+              durationMs: 500,
+              effect: 'appear',
+              targetElementId: '7',
+              targetParagraphIndex: 0,
+            },
+          ],
+        },
+      ],
+    }
+
+    const animation = normalizePresentation(raw).slides[0]?.animations[0]
+
+    expect(animation).toMatchObject({
+      id: 'build-1',
+      trigger: 'onClick',
+      durationMs: 500,
+      effect: 'appear',
+      targetElementIds: ['7'],
+      targetParagraphIndex: 0,
+    })
+  })
+
   it('normalizes motion-path descriptors into the runtime animation model', () => {
     const raw: RawPptxDocument = {
       slides: [

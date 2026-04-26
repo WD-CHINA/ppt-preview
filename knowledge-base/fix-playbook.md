@@ -478,6 +478,11 @@ pnpm build
 - 真实样本要区分两件事：`47e66b31f89d4b33b14c5010b92296c5.pptx` 已能验证 `push dir="u"`；`wipe` 则建议直接从现有小 deck 派生一个真实 fixture（如把 `演示文稿1.pptx` 的前四页 transition 改成 `wipe dir="r/l/u/d"`），再用浏览器逐页卡 mid-transition 检查 `frame.transitionDirection` 与 `.viewport` 的 `clipPath` 是否一致。这样可以把“纯函数四向测试”补成“真实 PPTX 四向回归”
 - 为了避免每次都手写一大段 `browser_console` 表达式，建议把这套流程沉淀成 repo 内可复用 harness（如 `public/transition-regression-harness.js`），并把固定 case 与预期结果记入 `fixtures/transition-regression-cases.md`。后续只要换 fixture / sourceSlideIndex / tickMs，就能重复收集 `frame + viewport styles` 证据。
 - 如果暂时还没有像素级截图对照，也先不要空着。至少落一份结构化 baseline（如 `fixtures/transition-regression-baseline.json`），把 `frame.transitionType / transitionDirection / transitionProgress` 与 viewport 的 `clipPath / transform / opacity` 固定下来；这样后续任何改动都能先做行为级 diff，再决定是否需要重新采集视觉基线。
+- 若主人要求“直接拿本机 WPS 做对照”，在 macOS 权限已开的前提下，可走一条真实链路：`osascript` 负责激活 WPS/触发放映与翻页，`screencapture -l <windowId>` 负责编辑态窗口截图，`ffmpeg -f avfoundation -i '1:none'` 负责录制放映中的全屏帧。对比时不要只信 `browser_vision` 主观判断，必须同时记录：
+  - WPS 录屏帧路径（如 `/tmp/wps-compare/video/...`）
+  - 浏览器 runtime 冻结态的结构化证据（`transitionFromSlideIndex / transitionProgress / viewport clipPath/transform/opacity`）
+  - 二进制 XML 复验结果（例如 `slide2.xml` 是否真的存在 `anim/seq/animEffect`）
+- `演示文稿1.pptx` 这类样本要明确区分“解析层当前读到了什么”和“WPS 放映主观表现像什么”：当前二进制里 `slide2.xml` 只有 timing root，runtime model 五页 `animations.length === 0`；上游 `pptxtojson@2.0.2` 源码当前也只覆盖 `p:transition`，没有对象级 timing/build parser。但 WPS 对照若仍显示出第 2 张逐步出现的感知，就应把它记成“WPS 对照与当前解析不一致”的 open case，而不是继续写死成“这份文件没有对象动画”。当前已补最小 `slide-animations.ts` timing parser，可提取 `clickEffect / withEffect / afterEffect` 到 `slide.animations`；下一步若要真正逼近“逐条淡入”，应继续补 `bldLst / paragraph build / txEl pRg` 与渲染消费层，而不是继续只看 WPS 截帧猜测。
 - 先把页面转场与 autoplay 节奏跑通；对象级 entrance animation 解析另行处理，不和这一刀混写
 
 代码落点：
@@ -517,25 +522,26 @@ pnpm build
 - [src/runtime/createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts)
 - [src/runtime/createPresentationRuntime.test.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.test.ts)
 
-### 7.4a 翻页中的 transition type / duration 要取 source slide，不要取 destination slide
+### 7.4a 翻页中的 transition type / duration 要取 destination slide，不要取 source slide
 
 适用问题：
 
-- 浏览器里每一页转场看起来都“慢一页”或类型错位：例如 `slide1=fade, slide2=push`，从第 1 页翻到第 2 页时却渲染成 push
-- tick 进度和 evaluator transitionType 都跟着目标页走，导致整份 deck 的转场语义 off-by-one
+- WPS 对照里每一页转场都看起来“慢一页”或类型错位：例如 `slide1=fade, slide2=push`，从第 1 页翻到第 2 页时，真实 WPS 更像渲染成 push
+- `演示文稿1.pptx` 的 `slide3 -> slide4`，若继续沿用 source slide，会被错误渲染成 `wipe`；而 WPS 对照与目标页 `fade` 更接近
 
 实践方案：
 
-- `createPresentationRuntime.goToSlide()` 开始 transition 前，先读取 `fromSlide` 的 `transition.durationMs`
-- `beginSlideTransition()` 与 `tickSlideTransition()` 期间都沿用 `transitionFromSlideIndex` 指向的 source slide 元数据
-- `evaluatePresentationFrame()` 在 `isTransitioning` 时用 `transitionFromSlideIndex` 读取 `transitionType`，只把 current viewport 内容切到 destination slide
-- 增加 facade/evaluator 回归测试，锁住“内容已切到目标页，但转场元数据仍属于 source slide”的语义
+- `createPresentationRuntime.goToSlide()` 开始 transition 前，读取目标页 `toSlide` 的 `transition.durationMs`
+- `beginSlideTransition()` 与 `tickSlideTransition()` 期间都沿用 `transitionToSlideIndex` 指向的 destination slide 元数据
+- `evaluatePresentationFrame()` 在 `isTransitioning` 时用 `transitionToSlideIndex` 读取 `transitionType / direction`，同时保留 `transitionFromSlideIndex` 给 previous viewport 内容来源
+- 增加 facade/evaluator 回归测试，锁住“翻页中的 transition 元数据属于目标页，而 previous viewport 仍来自源页”的语义
 
 代码落点：
 
 - [src/runtime/createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts)
 - [src/runtime/createPresentationRuntime.test.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.test.ts)
 - [src/runtime/transition/transitionEngine.ts](/Applications/work/ppt-preview/src/runtime/transition/transitionEngine.ts)
+- [src/runtime/transition/transitionEngine.test.ts](/Applications/work/ppt-preview/src/runtime/transition/transitionEngine.test.ts)
 - [src/runtime/evaluatePresentationFrame.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.ts)
 - [src/runtime/evaluatePresentationFrame.test.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.test.ts)
 

@@ -112,6 +112,7 @@ export interface RawPptxAnimation {
   effect?: 'appear' | 'fade' | string
   targetElementIds?: Array<string | number>
   targetElementId?: string | number
+  targetParagraphIndex?: number
   motionPath?: RawMotionPath
 }
 

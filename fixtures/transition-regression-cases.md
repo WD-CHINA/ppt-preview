@@ -44,21 +44,47 @@ await harness.runTransitionRegressionSuite([
 
 ## 已确认样本
 
-### 1. `fade-default`
+### 1. `push-default-real`
 - 文件：`演示文稿1.pptx`
 - 路径：`slide1 -> slide2`
 - 预期：
+  - `frame.transitionType = "push"`
+  - previous/current 共 2 个 viewport
+  - previous 向左退出，current 自右侧进入
+- 已记录样本值：
+  - `transitionProgress ≈ 0.583`
+  - previous：`transform = matrix(1, 0, 0, 1, -746.72, 0)`
+  - current：`transform = matrix(1, 0, 0, 1, 533.28, 0)`
+- WPS 对照备注：
+  - 录屏早期帧比旧版 `fade` 语义更接近目标页 `push`
+
+### 2. `wipe-story-path-real`
+- 文件：`演示文稿1.pptx`
+- 路径：`slide2 -> slide3`
+- 预期：
+  - `frame.transitionType = "wipe"`
+  - previous/current 共 2 个 viewport
+  - current 通过 `clip-path` 从左向右揭示
+- 已记录样本值：
+  - `transitionProgress ≈ 0.646`
+  - current：`clipPath = inset(0px 35% 0px 0px)`
+
+### 3. `fade-key-moment-real`
+- 文件：`演示文稿1.pptx`
+- 路径：`slide3 -> slide4`
+- 预期：
   - `frame.transitionType = "fade"`
-  - `frame.isTransitioning = true`
   - previous/current 共 2 个 viewport
   - previous：opacity 下降，transform 为轻微缩放
   - current：opacity 上升，transform 为轻微 `translateY(...)`
 - 已记录样本值：
-  - `transitionProgress ≈ 0.687`
-  - previous：`opacity = 0.312625`，`transform = matrix(0.986252, 0, 0, 0.986252, 0, 0)`
-  - current：`opacity = 0.687375`，`transform = matrix(1, 0, 0, 1, 0, 5.62725)`
+  - `transitionProgress ≈ 0.562`
+  - previous：`opacity = 0.437625`，`transform = matrix(0.988752, 0, 0, 0.988752, 0, 0)`
+  - current：`opacity = 0.562375`，`transform = matrix(1, 0, 0, 1, 0, 7.87725)`
+- WPS 对照备注：
+  - 目标页 `fade` 与真实放映更接近，旧版按 source 页渲染成 `wipe` 已被判定为错误
 
-### 2. `push-up-real`
+### 4. `push-up-real`
 - 文件：`47e66b31f89d4b33b14c5010b92296c5.pptx`
 - 路径：`slide2 -> slide3`
 - 准备方式：`goToSlide`
@@ -72,7 +98,7 @@ await harness.runTransitionRegressionSuite([
   - previous：`transform = matrix(1, 0, 0, 1, 0, 380.04)`
   - current：`transform = matrix(1, 0, 0, 1, 0, -339.96)`
 
-### 3. `wipe-right-real`
+### 5. `wipe-right-real`
 - 文件：`wipe-directions-fixture.pptx`
 - 路径：`slide1 -> slide2`
 - 准备方式：`goToSlide`
@@ -85,21 +111,21 @@ await harness.runTransitionRegressionSuite([
   - `transitionProgress ≈ 0.563`
   - current：`clipPath = inset(0px 44% 0px 0px)`
 
-### 4. `wipe-left-real`
+### 6. `wipe-left-real`
 - 文件：`wipe-directions-fixture.pptx`
 - 路径：`slide2 -> slide3`
 - 预期：
   - `frame.transitionDirection = "l"`
   - current：`clipPath = inset(0px 0px 0px 42%)`
 
-### 5. `wipe-up-real`
+### 7. `wipe-up-real`
 - 文件：`wipe-directions-fixture.pptx`
 - 路径：`slide3 -> slide4`
 - 预期：
   - `frame.transitionDirection = "u"`
   - current：`clipPath = inset(33% 0px 0px 0px)` 或同趋势值
 
-### 6. `wipe-down-real`
+### 8. `wipe-down-real`
 - 文件：`wipe-directions-fixture.pptx`
 - 路径：`slide4 -> slide5`
 - 预期：

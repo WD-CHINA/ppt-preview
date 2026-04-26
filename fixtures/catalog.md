@@ -138,10 +138,10 @@
 重点页面：
 
 - 第 1 页：`fade` 转场，`advTm=6000`；已确认通过 slide XML enhancer 回填 `advanceAfterMs`
-- 第 2 页：`push` 转场，`advTm=6500`；已确认浏览器中间态能看到 previous/current 双 viewport 水平推进；同时 repo 当前这份二进制复验未解析出对象级 animation（runtime model `animations.length === 0`）
-- 第 3 页：`wipe` 转场，`advTm=6500`；当前已补 typed transition style helper 与 `dir="r/l/u/d"` 四向 clip-path 支持，但仍待更系统的视觉回归
-- 运行时语义：翻页时应使用 source slide 的 `transition.type/duration`；否则会出现“每页转场都像慢一页/错位一页”的 off-by-one 错配
-- 全文档：未发现对象级 timing children，当前 XML 中只有 timing root；因此这份样本更适合作为“页面转场 + 自动播放”样本，而不是对象入场动画解析样本
+- 第 2 页：`push` 转场，`advTm=6500`；当前浏览器/WPS 对照表明 `slide1 -> slide2` 的视觉更接近目标页 `push` 语义，runtime 现已按 destination slide 读取转场元数据；同时 repo 当前这份二进制复验未解析出对象级 animation（runtime model `animations.length === 0`，且 `slide2.xml` 仍只有 timing root）
+- 第 3 页：`wipe` 转场，`advTm=6500`；在 destination slide 语义下，对应 `slide2 -> slide3` 的页间转场；`wipe` 四向 helper 已完成，但仍待更系统的 WPS 对照
+- 运行时语义：翻页时应使用 destination slide 的 `transition.type/duration`；WPS 对照下若继续按 source slide，会出现“每页转场都像慢一页/错位一页”的错配
+- 全文档：未发现对象级 timing children，当前 XML 中只有 timing root；因此这份样本更适合作为“页面转场 + 自动播放”样本，而不是对象入场动画解析样本；但 WPS 对照已证明“当前 parser 没读出来”不能直接等同于“文件本身没有对象级效果”
 
 标签：
 
@@ -152,12 +152,13 @@
 
 - 文件位置：[public/47e66b31f89d4b33b14c5010b92296c5.pptx](/Applications/work/ppt-preview/public/47e66b31f89d4b33b14c5010b92296c5.pptx)
 - 状态：`partial`
-- 用途：媒体与 timing 样本，同时用于验证带 `dir` 的 `push` 转场
+- 用途：媒体与 timing 样本，同时用于验证带 `dir` 的 `push` 转场，以及最小对象级 timing parser
 - 已确认页面：
   - `slide2.xml`：`<p:push dir="u"/>`
   - `slide6.xml`：`<p:push dir="u"/>`
   - `slide7.xml`：`<p:push dir="u"/>`
 - 浏览器回归：已确认 `slide2 -> slide3` 的 mid-transition 为双 viewport，上一页向下退出、下一页自上方进入，符合 `dir="u"` 的垂直推进
+- timing 回归：当前浏览器 runtime 已能在 `slide2/3/4/6/7/8` 读到最小 click-triggered `slide.animations`，说明 `slide-animations.ts` 已经把 `p:timing` 中的 `clickEffect` 注入到模型；当前解析仍主要覆盖媒体/简单 shape target，不代表完整 Office 对象动画已打通
 - 边界：当前仓库内仍缺少带 `dir` 的真实 `wipe` fixture，因此 `wipe r/l/u/d` 仍主要由纯函数测试覆盖
 
 标签：
