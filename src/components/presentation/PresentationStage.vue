@@ -95,6 +95,7 @@ onBeforeUnmount(() => {
           :width="props.frame.width"
           :height="props.frame.height"
           :transition-progress="props.frame.transitionProgress"
+          :transition-type="props.frame.transitionType"
           transition-role="previous"
         />
 
@@ -104,6 +105,7 @@ onBeforeUnmount(() => {
           :height="props.frame.height"
           active
           :transition-progress="props.frame.isTransitioning ? props.frame.transitionProgress : 1"
+          :transition-type="props.frame.transitionType"
           :transition-role="props.frame.isTransitioning ? 'current' : undefined"
         />
       </div>

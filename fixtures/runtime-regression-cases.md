@@ -15,9 +15,12 @@
   - `Playback Policy` 在 pending trigger 时阻止自动翻页
   - `Playback Policy` 在满足 `advanceAfterMs` 且无 pending trigger 时请求翻页
   - `Timeline Engine` 的 click trigger 计数、自动动画序列和基础 visibility/opacity 计算
+  - `Timeline Engine` 的最小 `motionPath` 几何计算（`translateX / translateY / rotate / progress`）
   - `Transition Engine` 的 transition start / progress / finish 状态写入
+  - Runtime / Evaluator 对转场元数据的归属语义：翻到下一页时，duration/type 应取 source slide，而不是 destination slide
   - `Media Engine` 的 registry、当前/前后页缓存窗口、远页 release、play/pause/mute/seek 计划
   - `Evaluator` 输出 slide-level media frames，给后续 MediaRenderer/DOM sync 留接口
+  - `Evaluator` 把 `motionPath` 投影到 `EvaluatedElementFrame.bounds` 与 `animationGeometry`，给 line/connector 后续高保真渲染留稳定接口
   - `Input Engine` 的键盘快捷键、舞台点击、触摸横向滑动到 runtime command 的映射
   - `Runtime Facade` 在 transition active 期间拒绝直接跳页 / 前后翻页，避免 frame/state 分歧导致冻结
 - 标签：

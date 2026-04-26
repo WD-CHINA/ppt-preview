@@ -150,14 +150,14 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
     }
 
     const fromIndex = state.activeSlideIndex
-    const toSlide = model.slides[clampedIndex]
-    const durationMs = getSlideTransitionDurationMs(toSlide)
+    const fromSlide = model.slides[fromIndex]
+    const durationMs = getSlideTransitionDurationMs(fromSlide)
 
     state.activeSlideIndex = clampedIndex
     resetSlideState()
 
     if (durationMs > 0) {
-      beginSlideTransition(state, { fromIndex, toIndex: clampedIndex, toSlide })
+      beginSlideTransition(state, { fromIndex, toIndex: clampedIndex, fromSlide })
       syncMedia()
       return
     }
@@ -200,7 +200,7 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
     const scaledDelta = deltaMs * state.playbackRate
 
     if (state.transitionToSlideIndex != null) {
-      const transitionSlide = model.slides[state.transitionToSlideIndex]
+      const transitionSlide = state.transitionFromSlideIndex != null ? model.slides[state.transitionFromSlideIndex] : undefined
       tickSlideTransition(state, transitionSlide, scaledDelta)
       syncMedia()
       return

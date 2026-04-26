@@ -34,6 +34,50 @@ const model: NormalizedPresentation = {
   slides: [slide('slide-1', [mediaElement('video-1')])],
 }
 
+const lineMotionModel: NormalizedPresentation = {
+  width: 1280,
+  height: 720,
+  theme: { colors: {} },
+  usedFonts: [],
+  slides: [
+    {
+      id: 'slide-line',
+      name: 'slide-line',
+      background: {},
+      autoplay: { advanceOnClick: true },
+      elements: [
+        {
+          id: 'line-1',
+          type: 'shape',
+          name: 'line-1',
+          order: 1,
+          bounds: { x: 100, y: 120, width: 160, height: 8, rotate: 0 },
+          style: {},
+          shape: { path: 'M 0 4 L 160 4', type: 'line' },
+          raw: null,
+        },
+      ],
+      animations: [
+        {
+          id: 'move-line-1',
+          trigger: 'afterPrevious',
+          durationMs: 1000,
+          targetElementIds: ['line-1'],
+          effect: 'fade',
+          motionPath: {
+            xFrom: 0,
+            yFrom: 0,
+            xTo: 40,
+            yTo: -20,
+            rotateFrom: 0,
+            rotateTo: 10,
+          },
+        },
+      ],
+    },
+  ],
+}
+
 const state: PresentationRuntimeState = {
   sessionStatus: 'playing',
   activeSlideIndex: 0,
@@ -63,5 +107,49 @@ describe('evaluatePresentationFrame media output', () => {
         playback: { action: 'play', muted: true, playbackRate: 1, seekMs: 1200 },
       },
     ])
+  })
+
+  it('projects motion-path geometry into evaluated line bounds', () => {
+    const frame = evaluatePresentationFrame(lineMotionModel, { ...state, timelinePositionMs: 500, slideElapsedMs: 500 })
+    const line = frame.current?.elements[0]
+
+    expect(line?.bounds).toEqual({ x: 120, y: 110, width: 160, height: 8, rotate: 5 })
+    expect(line?.animationGeometry).toEqual({
+      progress: 0.5,
+      translateX: 20,
+      translateY: -10,
+      rotate: 5,
+    })
+  })
+
+  it('uses the source slide transition metadata while transitioning into the next slide', () => {
+    const transitionModel: NormalizedPresentation = {
+      width: 1280,
+      height: 720,
+      theme: { colors: {} },
+      usedFonts: [],
+      slides: [
+        {
+          ...slide('slide-1', []),
+          transition: { type: 'fade', durationMs: 800 },
+        },
+        {
+          ...slide('slide-2', []),
+          transition: { type: 'push', durationMs: 800 },
+        },
+      ],
+    }
+
+    const frame = evaluatePresentationFrame(transitionModel, {
+      ...state,
+      activeSlideIndex: 1,
+      sessionStatus: 'transitioning',
+      transitionProgress: 0.25,
+      transitionFromSlideIndex: 0,
+      transitionToSlideIndex: 1,
+    })
+
+    expect(frame.currentSlideIndex).toBe(1)
+    expect(frame.transitionType).toBe('fade')
   })
 })

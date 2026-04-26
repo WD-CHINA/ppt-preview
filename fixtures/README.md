@@ -12,6 +12,8 @@
 
 补充约定：Runtime / Policy / Engine 拆分类问题可以使用不依赖 PPTX 的合成 fixture，记录在 [runtime-regression-cases.md](./runtime-regression-cases.md)。真实 PPTX fixture 用于视觉/解析还原，合成 fixture 用于锁住状态机行为边界。
 
+表格类问题同时维护 [table-regression-cases.md](./table-regression-cases.md)：用合成测试锁住 `NormalizedTableMeta` 与 renderer helper 行为，用真实 PPTX 页面索引推进视觉回归。
+
 ## 使用约定
 
 每个 fixture 至少记录以下信息：
@@ -41,6 +43,9 @@
 - `theme-color`
 - `math-media`
 - `table`
+- `table-renderer`
+- `table-merge`
+- `table-typography`
 - `chart`
 - `diagram`
 - `transition`

@@ -110,6 +110,12 @@
   - 终点和目标不重合
 - 代表案例：
   - `4b00...pptx` 第 3、4、7 页
+- 当前进展：
+  - 已不再把所有 marker 一律画成同一个三角形，renderer 已开始区分 `triangle / stealth / diamond / oval`
+  - 真实页 browser 复验显示：第 4 / 7 页的 connector 已恢复可见，不再是“整批线条不见”
+  - 但真实 PPT 里的 marker size 比例、refX/refY、路径端点与 line geometry 的精确对齐仍未完成
+  - 第 4 页仍存在箭头头尾不够明确、线长不自然、文字锚点和虫体部位落点偏差
+  - 第 7 页虽已能表达影子与明暗交界线，但下方多条 connector 仍偏拥挤，长度与落点统一性不足
 
 ### 4.3 辅助虚线框误显示
 
@@ -205,9 +211,71 @@
   - `media-mime`
   - `math-media`
 
-## 10. Runtime Engine 拆分
+## 10. 表格渲染
 
-### 9.1 集中式 Runtime 继续堆逻辑会放大回归风险
+### 10.1 table 元素只显示占位或缺失结构
+
+- 状态：`partial`
+- 典型现象：
+  - `pptxtojson` 已经解析出 `type='table'`
+  - 播放器里只出现 table 占位框，无法阅读单元格内容
+  - 行高、列宽、单元格填充、字体颜色、基础边框丢失
+- 已覆盖基线：
+  - `normalizePresentation` 已把 `data / rowHeights / colWidths` 标准化为 `NormalizedTableMeta`
+  - `TableRenderer` 已按 CSS grid 渲染基础行列、cell span、fill/font/border/vAlign
+  - `tableModel` 已过滤 `hMerge / vMerge` continuation cell，避免合并单元格重复渲染
+  - `tableModel` 已把 fallback border 从 CSS class 收敛到按 row/column position 生成，避免内部边框双线
+  - 基础 table typography 已覆盖 `fontFamily / fontSize / fontItalic / fontUnderline` 的 normalize 与渲染映射
+  - 小字号 table cell 已补第一轮 typography 策略：`fontSize <= 16px` 时提高 `lineHeight/padding`，并把 `overflow-wrap` 从 `anywhere` 收紧到 `break-word`
+  - 单个长英文标签已补第二轮 typography 策略：对“无空格且长度 >= 10”的文本优先缩小字号并禁止硬拆词，而不是直接继续依赖浏览器断词
+  - 已补第三轮列宽感知策略：结合 `table.colWidths` 与 `columnIndex/colSpan` 估算窄列可用宽度，对极窄列里的单个长英文标签进一步缩小字号和收紧 padding
+  - 已补第四轮 paragraph-aware 策略：对多段正文（`<p>` 数量 > 1）的小字号 cell 单独提高 `lineHeight/padding`，并明确用 `word-break: normal + overflow-wrap: break-word`
+  - 已补第五轮 run-level font-size 策略：从 cell HTML 的内联 `font-size` 提取最大 run 字号，作为 effective font size 参与 typography bucket 决策
+  - 已通过浏览器视觉冒烟验证 `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 24 / 26 / 31 页：结构可读，未见明显内部双线、重复渲染或布局破坏；其中第 24、26 页小字偏小，仍待后续 typography 补强
+  - 已通过浏览器视觉冒烟验证剩余真实 table 页：`AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 5 页、`AI Beatify Slides Example.pptx` 第 4 页、`83f822650ce0499c835780f673faed2b.pptx` 第 4 页；当前共识是结构已相对稳定，主问题集中到 typography
+  - 已通过 XML 扫描定位真实 table 页：`AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 5/24/26/31 页、`AI Beatify Slides Example.pptx` 第 4 页、`83f822650ce0499c835780f673faed2b.pptx` 第 4 页
+- 代表测试：
+  - `src/adapters/pptxtojson/normalizePresentation.test.ts`
+  - `src/components/presentation/tableModel.test.ts`
+- 仍未覆盖：
+  - 完整 Office table style/theme 继承
+  - 真实 PPTX 截图回归
+  - 更完整的 table cell typography（cell padding、line-height、paragraph run 级字号与换行）
+  - 英文单词断裂和局部裁切仍未完全解决；真实页说明即使补了列宽感知、paragraph-aware 和 run-level font-size 策略，cell 级启发式仍不够，后续需要更完整的 paragraph/run 级策略
+  - 更精细的显式 border 冲突优先级 / overlapping border 策略
+- 关键标签：
+  - `table`
+  - `table-renderer`
+  - `table-merge`
+  - `table-typography`
+
+## 11. Runtime Engine 拆分
+
+### 11.2 页面转场自动播放时间丢失时，优先从 slide XML 的 `p:transition advTm` 回填
+
+- 状态：`partial`
+- 典型现象：
+  - PPT 原文件设置了自动翻页节奏，但 runtime 里 `slide.autoplay.advanceAfterMs` 为空
+  - 点击“播放”后页面不会按预期自动翻页
+- 代表案例：
+  - `演示文稿1.pptx` 全文档
+- 已覆盖基线：
+  - `slide-transitions.ts` 已从 slide XML 读取 `p:transition` 的 `type / spd / advTm`
+  - `textBodyInsets.ts` orchestration 已把 transition metadata 回填到 raw slide
+  - `normalizePresentation` 已把 `transition.advanceAfterMs/advTm` 作为 autoplay fallback 归一化到 `slide.autoplay.advanceAfterMs`
+  - `transitionViewportModel.ts` 已开始按 `fade / push / wipe` 派发不同的 viewport 中间态样式
+  - 浏览器回归已确认 `演示文稿1.pptx` 第 2 页 push 中间态表现为 previous/current 双 viewport 水平推进
+  - `createPresentationRuntime/evaluatePresentationFrame` 已补回归：翻页中的 transition duration/type 取 source slide，避免整份 deck 的转场类型与节奏整体错位一页
+- 仍未覆盖：
+  - 更复杂的转场方向参数
+  - wipe 的更系统视觉回归
+  - 对象级 entrance animation 解析；当前 `演示文稿1.pptx` 的 slide XML 只有 timing root，没有对象级 timing children，不能作为 entrance parser 回归样本
+- 代表测试：
+  - `src/adapters/pptxtojson/enhancers/slide-transitions.test.ts`
+  - `src/adapters/pptxtojson/normalizePresentation.test.ts`
+  - `src/components/presentation/transitionViewportModel.test.ts`
+
+### 11.1 集中式 Runtime 继续堆逻辑会放大回归风险
 
 - 状态：`partial`
 - 典型现象：
@@ -217,10 +285,12 @@
   - `Session Store` 初始状态、slide state reset、`waitingTrigger` 同步
   - `Playback Policy` 自动翻页与 click trigger 的优先级
   - `Timeline Engine` click trigger 计数、自动动画序列、基础 visibility/opacity
+  - `Timeline Engine` 已补最小 `motionPath` 几何描述：`translateX / translateY / rotate / progress`
   - `Transition Engine` transition start / progress / finish
   - `Media Engine` registry/cache/playback plan 与 Evaluator media frame
   - `Input Engine` keyboard / pointer / touch gesture 到 runtime command 的映射
   - `Runtime Facade` transition active 期间拒绝直接跳页 / 前后翻页，避免状态冻结
+  - `Evaluator` 已把 `motionPath` 投影到 `EvaluatedElementFrame.bounds` 与 `animationGeometry`，给 line/connector 后续高保真渲染留接口
 - 代表测试：
   - `src/runtime/createPresentationRuntime.test.ts`
   - `src/runtime/sessionStore.test.ts`

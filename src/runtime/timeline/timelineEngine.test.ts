@@ -3,6 +3,7 @@ import type { NormalizedAnimation } from '../../types/presentation'
 import {
   buildAutoAnimationSequence,
   countOnClickAnimations,
+  evaluateAnimationGeometry,
   evaluateAnimationVisibility,
   getOnClickAnimationIndex,
 } from './timelineEngine'
@@ -69,6 +70,31 @@ describe('timeline engine', () => {
     expect(evaluateAnimationVisibility(animationAt(0), animations, { timelinePositionMs: 300, currentTriggerIndex: 0 })).toEqual({
       visible: true,
       opacity: 0.5,
+    })
+  })
+
+  it('evaluates motion-path geometry from timeline progress', () => {
+    const movingAnimation: NormalizedAnimation = {
+      id: 'move-line',
+      trigger: 'afterPrevious',
+      durationMs: 1000,
+      targetElementIds: ['line-1'],
+      effect: 'fade',
+      motionPath: {
+        xFrom: 0,
+        yFrom: 0,
+        xTo: 40,
+        yTo: -20,
+        rotateFrom: 0,
+        rotateTo: 10,
+      },
+    }
+
+    expect(evaluateAnimationGeometry(movingAnimation, [movingAnimation], { timelinePositionMs: 500, currentTriggerIndex: 0 })).toEqual({
+      progress: 0.5,
+      translateX: 20,
+      translateY: -10,
+      rotate: 5,
     })
   })
 })

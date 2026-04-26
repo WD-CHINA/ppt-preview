@@ -5,6 +5,9 @@ import type {
   NormalizedElement,
   NormalizedElementType,
   NormalizedPresentation,
+  NormalizedTableBorder,
+  NormalizedTableCell,
+  NormalizedTableMeta,
   SlideBackground,
   SlideTransitionMeta,
 } from '../../types/presentation'
@@ -50,7 +53,7 @@ function normalizeSlide(
     transition: normalizeTransition(rawSlide.transition),
     autoplay: {
       advanceOnClick: rawSlide.autoplay?.advanceOnClick ?? true,
-      advanceAfterMs: rawSlide.autoplay?.advanceAfterMs,
+      advanceAfterMs: rawSlide.autoplay?.advanceAfterMs ?? normalizeTransitionAdvanceAfterMs(rawSlide.transition),
     },
     elements: normalizedElements
       .filter((element) => !isImageAuxiliaryRect(element, normalizedElements))
@@ -280,6 +283,14 @@ function normalizeTransition(rawTransition: RawPptxSlide['transition']): SlideTr
   }
 }
 
+function normalizeTransitionAdvanceAfterMs(rawTransition: RawPptxSlide['transition']) {
+  if (!rawTransition) {
+    return undefined
+  }
+
+  return normalizeOptionalNumber(rawTransition.advanceAfterMs ?? rawTransition.advTm)
+}
+
 function normalizeElement(
   rawElement: RawPptxElement,
   slideIndex: number,
@@ -307,6 +318,7 @@ function normalizeElement(
     style: normalizeStyle(type, rawElement),
     media,
     shape: normalizeShapeMeta(rawElement),
+    table: normalizeTableMeta(type, rawElement),
     children: normalizeChildren(rawElement, slideIndex),
     raw: rawElement,
   }
@@ -437,6 +449,10 @@ function normalizeNumber(input: number | undefined, fallback: number): number {
   return typeof input === 'number' && Number.isFinite(input) ? input : fallback
 }
 
+function normalizeOptionalNumber(input: number | undefined) {
+  return typeof input === 'number' && Number.isFinite(input) ? input : undefined
+}
+
 function normalizeOptionalPointLength(input: number | undefined, fallback: number): number {
   if (typeof input !== 'number' || !Number.isFinite(input)) {
     return fallback
@@ -564,6 +580,119 @@ function normalizeChildren(rawElement: RawPptxElement, slideIndex: number) {
   return rawElement.elements
     .map((child, childIndex) => normalizeElement(child, slideIndex, childIndex))
     .sort((a, b) => a.order - b.order)
+}
+
+function normalizeTableMeta(type: NormalizedElementType, rawElement: RawPptxElement): NormalizedTableMeta | undefined {
+  if (type !== 'table' || !Array.isArray(rawElement.data)) {
+    return undefined
+  }
+
+  return {
+    rowHeights: normalizeTableLengths(rawElement.rowHeights),
+    colWidths: normalizeTableLengths(rawElement.colWidths),
+    cells: rawElement.data.map((row) => normalizeTableRow(row)),
+  }
+}
+
+function normalizeTableLengths(input: unknown) {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  return input.map((value) => normalizePointLength(typeof value === 'number' ? value : undefined, 0))
+}
+
+function normalizeTableRow(input: unknown): NormalizedTableCell[] {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  return input.map((cell) => normalizeTableCell(cell))
+}
+
+function normalizeTableCell(input: unknown): NormalizedTableCell {
+  if (!input || typeof input !== 'object') {
+    return {}
+  }
+
+  const rawCell = input as Record<string, unknown>
+  const cell: NormalizedTableCell = {}
+
+  if (typeof rawCell.text === 'string') cell.text = rawCell.text
+  if (typeof rawCell.rowSpan === 'number') cell.rowSpan = rawCell.rowSpan
+  if (typeof rawCell.colSpan === 'number') cell.colSpan = rawCell.colSpan
+  if (typeof rawCell.vMerge === 'number') cell.vMerge = rawCell.vMerge
+  if (typeof rawCell.hMerge === 'number') cell.hMerge = rawCell.hMerge
+  if (typeof rawCell.vAlign === 'string') cell.vAlign = rawCell.vAlign
+  cell.fontFamily = normalizeTableCellFontFamily(rawCell)
+  cell.fontSize = normalizeTableCellFontSize(rawCell)
+  if (typeof rawCell.fontBold === 'boolean') cell.fontBold = rawCell.fontBold
+  if (typeof rawCell.fontItalic === 'boolean') cell.fontItalic = rawCell.fontItalic
+  if (typeof rawCell.italic === 'boolean') cell.fontItalic = rawCell.italic
+  if (typeof rawCell.fontUnderline === 'boolean') cell.fontUnderline = rawCell.fontUnderline
+  if (typeof rawCell.underline === 'boolean') cell.fontUnderline = rawCell.underline
+  if (typeof rawCell.fontColor === 'string') cell.fontColor = rawCell.fontColor
+  if (typeof rawCell.fillColor === 'string') cell.fillColor = rawCell.fillColor
+
+  cell.borders = normalizeTableBorders(rawCell.borders)
+
+  return cell
+}
+
+function normalizeTableCellFontFamily(rawCell: Record<string, unknown>) {
+  for (const key of ['fontFamily', 'fontFace', 'typeface']) {
+    const value = rawCell[key]
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+  }
+
+  return undefined
+}
+
+function normalizeTableCellFontSize(rawCell: Record<string, unknown>) {
+  const rawValue = rawCell.fontSize ?? rawCell.fontSz ?? rawCell.sz
+  const numericValue = typeof rawValue === 'number' ? rawValue : typeof rawValue === 'string' ? Number(rawValue) : undefined
+
+  if (typeof numericValue !== 'number' || !Number.isFinite(numericValue) || numericValue <= 0) {
+    return undefined
+  }
+
+  const pointSize = numericValue > 400 ? numericValue / 100 : numericValue
+  return normalizePointLength(pointSize, 0)
+}
+
+function normalizeTableBorders(input: unknown): NormalizedTableCell['borders'] {
+  if (!input || typeof input !== 'object') {
+    return undefined
+  }
+
+  const rawBorders = input as Record<string, unknown>
+  const borders: NormalizedTableCell['borders'] = {}
+
+  for (const side of ['top', 'right', 'bottom', 'left'] as const) {
+    const border = normalizeTableBorder(rawBorders[side])
+    if (border) {
+      borders[side] = border
+    }
+  }
+
+  return Object.keys(borders).length > 0 ? borders : undefined
+}
+
+function normalizeTableBorder(input: unknown): NormalizedTableBorder | undefined {
+  if (!input || typeof input !== 'object') {
+    return undefined
+  }
+
+  const rawBorder = input as Record<string, unknown>
+  const border: NormalizedTableBorder = {}
+
+  if (typeof rawBorder.color === 'string') border.color = rawBorder.color
+  if (typeof rawBorder.width === 'number') border.width = rawBorder.width
+  if (typeof rawBorder.type === 'string') border.type = rawBorder.type
+
+  return Object.keys(border).length > 0 ? border : undefined
 }
 
 function normalizeShapeMeta(rawElement: RawPptxElement) {
@@ -767,6 +896,27 @@ function normalizeAnimation(
     durationMs: normalizeNumber(rawAnimation.durationMs ?? rawAnimation.duration, 350),
     targetElementIds,
     effect: rawAnimation.effect === 'appear' || rawAnimation.effect === 'fade' ? rawAnimation.effect : 'fade',
+    motionPath: normalizeMotionPath(rawAnimation.motionPath),
+  }
+}
+
+function normalizeMotionPath(rawMotionPath: RawPptxAnimation['motionPath']) {
+  if (!rawMotionPath || typeof rawMotionPath !== 'object') {
+    return undefined
+  }
+
+  const xFrom = normalizeNumber(rawMotionPath.xFrom, 0)
+  const yFrom = normalizeNumber(rawMotionPath.yFrom, 0)
+  const xTo = normalizeNumber(rawMotionPath.xTo ?? (rawMotionPath.xBy != null ? xFrom + normalizeNumber(rawMotionPath.xBy, 0) : undefined), xFrom)
+  const yTo = normalizeNumber(rawMotionPath.yTo ?? (rawMotionPath.yBy != null ? yFrom + normalizeNumber(rawMotionPath.yBy, 0) : undefined), yFrom)
+
+  return {
+    xFrom,
+    yFrom,
+    xTo,
+    yTo,
+    rotateFrom: normalizeNumber(rawMotionPath.rotateFrom, 0),
+    rotateTo: normalizeNumber(rawMotionPath.rotateTo, 0),
   }
 }
 

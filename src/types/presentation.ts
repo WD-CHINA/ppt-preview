@@ -84,6 +84,35 @@ export interface LineEndMarker {
   length?: string
 }
 
+export interface NormalizedTableBorder {
+  color?: string
+  width?: number
+  type?: string
+}
+
+export interface NormalizedTableCell {
+  text?: string
+  rowSpan?: number
+  colSpan?: number
+  vMerge?: number
+  hMerge?: number
+  vAlign?: 'up' | 'mid' | 'down' | string
+  fontFamily?: string
+  fontSize?: number
+  fontBold?: boolean
+  fontItalic?: boolean
+  fontUnderline?: boolean
+  fontColor?: string
+  fillColor?: string
+  borders?: Partial<Record<'top' | 'right' | 'bottom' | 'left', NormalizedTableBorder>>
+}
+
+export interface NormalizedTableMeta {
+  rowHeights: number[]
+  colWidths: number[]
+  cells: NormalizedTableCell[][]
+}
+
 export interface NormalizedElement {
   id: string
   type: NormalizedElementType
@@ -95,8 +124,18 @@ export interface NormalizedElement {
   style: Record<string, string>
   media?: MediaResource
   shape?: NormalizedShapeMeta
+  table?: NormalizedTableMeta
   children?: NormalizedElement[]
   raw: unknown
+}
+
+export interface NormalizedMotionPath {
+  xFrom: number
+  yFrom: number
+  xTo: number
+  yTo: number
+  rotateFrom: number
+  rotateTo: number
 }
 
 export interface NormalizedAnimation {
@@ -105,6 +144,7 @@ export interface NormalizedAnimation {
   durationMs: number
   targetElementIds: string[]
   effect: 'appear' | 'fade'
+  motionPath?: NormalizedMotionPath
 }
 
 export interface NormalizedSlide {
@@ -143,6 +183,13 @@ export interface PresentationRuntimeState {
   playbackRate: number
 }
 
+export interface EvaluatedAnimationGeometry {
+  progress: number
+  translateX: number
+  translateY: number
+  rotate: number
+}
+
 export interface EvaluatedElementFrame {
   id: string
   name: string
@@ -156,7 +203,9 @@ export interface EvaluatedElementFrame {
   html?: string
   media?: MediaResource
   bounds: NormalizedElementBounds
+  animationGeometry?: EvaluatedAnimationGeometry
   shape?: NormalizedShapeMeta
+  table?: NormalizedTableMeta
   children?: EvaluatedElementFrame[]
 }
 
@@ -186,6 +235,7 @@ export interface PresentationFrame {
   currentSlideIndex: number
   isTransitioning: boolean
   transitionProgress: number
+  transitionType?: string
   current?: EvaluatedSlideFrame
   previous?: EvaluatedSlideFrame
   next?: EvaluatedSlideFrame

@@ -20,11 +20,11 @@
   标签：`text-position`, `shape-position`
 - 第 3 页：学知识，左右文本布局、文本换行、图片左右说明文、箭头指向  
   标签：`text-inset`, `text-wrap`, `text-position`, `arrow-marker`
-- 第 4 页：观察组成，辅助虚线框、标注线、底部说明文字换行  
+- 第 4 页：观察组成，辅助虚线框、标注线、底部说明文字换行；本轮浏览器复验确认 connector / arrow 已恢复可见，不再是大面积缺失，但箭头头尾样式、线长和与文字/虫体部位的对齐仍有明显偏差  
   标签：`helper-frame`, `text-wrap`, `connector`, `arrow-marker`
 - 第 5 页：观察造型，虚线/实线辅助框显示错误  
   标签：`helper-frame`, `shape-border`
-- 第 7 页：观察明暗，箭头缺失、箭头长度和方向错误  
+- 第 7 页：观察明暗，箭头缺失、箭头长度和方向错误；当前 renderer 已从“统一三角形 marker”升级为区分 `triangle / stealth / diamond / oval` 的最小 type-aware marker，本轮浏览器复验确认箭头/连线已恢复可见，能表达影子与明暗交界线标注，但下方多条 connector 仍偏拥挤，线长和落点不够统一  
   标签：`arrow-marker`, `connector`
 - 第 10 页：作画工具，圆角黄色边框缺失或只显示局部  
   标签：`shape-border`, `shape-path`
@@ -73,11 +73,15 @@
 ## 5. `AI.Tech.Agency.Infographics.by.Slidesgo.pptx`
 
 - 文件位置：[public/AI.Tech.Agency.Infographics.by.Slidesgo.pptx](/Applications/work/ppt-preview/public/AI.Tech.Agency.Infographics.by.Slidesgo.pptx)
-- 状态：`backlog`
+- 状态：`partial`
 - 用途：大体量模板，压测 group、connector、arrow、table、复杂 text inset
 
 关注点：
 
+- 第 5 页：3 x 3 table；已完成浏览器视觉冒烟验证，结构稳定、无明显双线或重复渲染，但 `INTERMEDIATE` 等英文仍有硬拆分，正文 typography 仍待补强
+- 第 24 页：5 x 2 table，包含 `gridSpan / hMerge` 合并单元格；已完成浏览器视觉冒烟验证，结构可读且未见明显内部双线；本轮已补基础 table typography 字段归一化与渲染样式映射
+- 第 26 页：5 x 6 table；已完成浏览器视觉冒烟验证，结构对齐正常，未见明显重复渲染或内部双线，但单元格小字在舞台预览中仍偏小
+- 第 31 页：4 x 5 table；已完成浏览器视觉冒烟验证，文字可读，边框与网格稳定，未见明显内部双线或布局破坏
 - group 坐标体系
 - connector / arrow 大量分布
 - table 渲染
@@ -89,32 +93,62 @@
 - `arrow-marker`
 - `connector`
 - `table`
+- `table-typography`
 - `text-inset`
 
 ## 6. `AI Beatify Slides Example.pptx`
 
 - 文件位置：[public/AI Beatify Slides Example.pptx](/Applications/work/ppt-preview/public/AI%20Beatify%20Slides%20Example.pptx)
-- 状态：`backlog`
+- 状态：`partial`
 - 用途：模板型回归样本，覆盖 bullet / table / 标题布局
+
+重点页面：
+
+- 第 4 页：4 x 2 table；已完成浏览器视觉冒烟验证，结构基本正确，但字号偏小、文本拥挤、局部有裁切感，当前主问题是 table typography
 
 标签：
 
 - `bullet`
 - `table`
 - `text-wrap`
+- `table-typography`
 
 ## 7. `83f822650ce0499c835780f673faed2b.pptx`
 
 - 文件位置：[public/83f822650ce0499c835780f673faed2b.pptx](/Applications/work/ppt-preview/public/83f822650ce0499c835780f673faed2b.pptx)
-- 状态：`backlog`
+- 状态：`partial`
 - 用途：表格和项目符号样本
+
+重点页面：
+
+- 第 4 页：4 x 2 table；已完成浏览器视觉冒烟验证，结构稳定、无明显双线/重复渲染，但小字偏小、行高偏紧
 
 标签：
 
 - `table`
 - `bullet`
+- `table-typography`
 
-## 8. `47e66b31f89d4b33b14c5010b92296c5.pptx`
+## 9. `演示文稿1.pptx`
+
+- 文件位置：[public/演示文稿1.pptx](/Applications/work/ppt-preview/public/%E6%BC%94%E7%A4%BA%E6%96%87%E7%A8%BF1.pptx)
+- 状态：`active`
+- 用途：小型页面转场回归样本，覆盖 `fade / push / wipe` 与基于 `advTm` 的自动翻页
+
+重点页面：
+
+- 第 1 页：`fade` 转场，`advTm=6000`；已确认通过 slide XML enhancer 回填 `advanceAfterMs`
+- 第 2 页：`push` 转场，`advTm=6500`；已确认浏览器中间态能看到 previous/current 双 viewport 水平推进
+- 第 3 页：`wipe` 转场，`advTm=6500`；当前已补 typed transition style helper，但仍待更系统的视觉回归
+- 运行时语义：翻页时应使用 source slide 的 `transition.type/duration`；否则会出现“每页转场都像慢一页/错位一页”的 off-by-one 错配
+- 全文档：未发现对象级 timing children，当前 XML 中只有 timing root；因此这份样本更适合作为“页面转场 + 自动播放”样本，而不是对象入场动画解析样本
+
+标签：
+
+- `transition`
+- `timing`
+
+## 10. `47e66b31f89d4b33b14c5010b92296c5.pptx`
 
 - 文件位置：[public/47e66b31f89d4b33b14c5010b92296c5.pptx](/Applications/work/ppt-preview/public/47e66b31f89d4b33b14c5010b92296c5.pptx)
 - 状态：`backlog`
@@ -208,3 +242,18 @@
 - `touch-swipe`
 - `media-sync`
 - `timing`
+
+## 14. Table renderer synthetic regression fixtures
+
+- 文件位置：
+  - [src/adapters/pptxtojson/normalizePresentation.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/normalizePresentation.test.ts)
+  - [src/components/presentation/tableModel.test.ts](/Applications/work/ppt-preview/src/components/presentation/tableModel.test.ts)
+- 状态：`covered-by-test`
+- 用途：表格渲染首批最小回归样本，先锁住 pptxtojson `data / rowHeights / colWidths` 到 `NormalizedTableMeta` 的转换，以及 `TableRenderer` 消费的 grid track、cell span、fill/font/border/vAlign 样式映射；第二批补充 `hMerge / vMerge` continuation cell 过滤，避免合并单元格重复渲染撑乱 CSS grid；本轮补充基础 typography 字段 `fontFamily / fontSize / fontItalic / fontUnderline` 的 normalize 与 renderer helper 映射
+
+标签：
+
+- `table`
+- `table-renderer`
+- `table-merge`
+- `table-typography`

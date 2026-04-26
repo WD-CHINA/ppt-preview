@@ -16,6 +16,13 @@ export interface AnimationVisibilityState {
   opacity: number
 }
 
+export interface AnimationGeometryState {
+  progress: number
+  translateX: number
+  translateY: number
+  rotate: number
+}
+
 export function countOnClickAnimations(animations: NormalizedAnimation[]) {
   return animations.filter((animation) => animation.trigger === 'onClick').length
 }
@@ -76,4 +83,54 @@ export function evaluateAnimationVisibility(
     visible: true,
     opacity: animation.effect === 'appear' ? 1 : progress,
   }
+}
+
+export function evaluateAnimationGeometry(
+  animation: NormalizedAnimation,
+  animations: NormalizedAnimation[],
+  state: TimelineCursorState,
+): AnimationGeometryState | null {
+  if (!animation.motionPath) {
+    return null
+  }
+
+  const progress = getAnimationProgress(animation, animations, state)
+  const xDelta = animation.motionPath.xTo - animation.motionPath.xFrom
+  const yDelta = animation.motionPath.yTo - animation.motionPath.yFrom
+  const rotateDelta = animation.motionPath.rotateTo - animation.motionPath.rotateFrom
+
+  return {
+    progress,
+    translateX: animation.motionPath.xFrom + xDelta * progress,
+    translateY: animation.motionPath.yFrom + yDelta * progress,
+    rotate: animation.motionPath.rotateFrom + rotateDelta * progress,
+  }
+}
+
+function getAnimationProgress(
+  animation: NormalizedAnimation,
+  animations: NormalizedAnimation[],
+  state: TimelineCursorState,
+) {
+  if (animation.trigger === 'onClick') {
+    const triggerIndex = getOnClickAnimationIndex(animations, animation.id)
+    return triggerIndex >= 0 && triggerIndex < state.currentTriggerIndex ? 1 : 0
+  }
+
+  const autoSequence = buildAutoAnimationSequence(animations)
+  const autoEntry = autoSequence.find((entry) => entry.animation.id === animation.id)
+
+  if (!autoEntry) {
+    return 1
+  }
+
+  if (state.timelinePositionMs <= autoEntry.startMs) {
+    return 0
+  }
+
+  if (state.timelinePositionMs >= autoEntry.endMs) {
+    return 1
+  }
+
+  return (state.timelinePositionMs - autoEntry.startMs) / Math.max(autoEntry.animation.durationMs, 1)
 }

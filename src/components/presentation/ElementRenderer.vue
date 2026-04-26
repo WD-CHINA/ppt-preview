@@ -2,6 +2,9 @@
 import { computed } from 'vue'
 import type { CSSProperties } from 'vue'
 import type { EvaluatedElementFrame } from '../../types/presentation'
+import TableRenderer from './TableRenderer.vue'
+import { createLineMarkerModel } from './lineMarkerModel'
+import { getShapeSvgPaintModel } from './shapeSvgModel'
 
 const props = defineProps<{
   element: EvaluatedElementFrame
@@ -77,19 +80,19 @@ const shouldRenderText = computed(() => props.element.type === 'text' || hasText
 const shapePath = computed(() => props.element.shape?.path)
 const shouldRenderShapeSvg = computed(() => shouldRenderSvgShape(props.element) && Boolean(shapePath.value))
 
-const shapeFill = computed(() => {
-  const background = props.element.style.background
+const shapePaintModel = computed(() =>
+  getShapeSvgPaintModel({
+    shapeType: props.element.shape?.type,
+    background: props.element.style.background,
+    border: props.element.style.border,
+  }),
+)
 
-  if (!background || background === 'transparent') {
-    return 'none'
-  }
+const shapeFill = computed(() => shapePaintModel.value.fill)
 
-  return background
-})
+const shapeStroke = computed(() => shapePaintModel.value.stroke)
 
-const shapeStroke = computed(() => parseBorderColor(props.element.style.border))
-
-const shapeStrokeWidth = computed(() => parseBorderWidth(props.element.style.border))
+const shapeStrokeWidth = computed(() => shapePaintModel.value.strokeWidth)
 
 const shapeStrokeDasharray = computed(() => props.element.style['--ppt-stroke-dasharray'])
 
@@ -103,6 +106,8 @@ const shapeMarkerStart = computed(() => {
   return `url(#${markerIdBase.value}-start)`
 })
 
+const shapeMarkerStartModel = computed(() => createLineMarkerModel(props.element.shape?.lineHeadEnd, 'start'))
+
 const shapeMarkerEnd = computed(() => {
   if (!shouldRenderLineMarker(props.element.shape?.lineTailEnd?.type)) {
     return undefined
@@ -110,6 +115,8 @@ const shapeMarkerEnd = computed(() => {
 
   return `url(#${markerIdBase.value}-end)`
 })
+
+const shapeMarkerEndModel = computed(() => createLineMarkerModel(props.element.shape?.lineTailEnd, 'end'))
 
 const shapePathTransform = computed(() => {
   const width = props.element.shape?.viewBoxWidth ?? props.element.bounds.width
@@ -126,10 +133,6 @@ const shapePathTransform = computed(() => {
 
   return transforms.join(' ')
 })
-
-const shapeMarkerStartSize = computed(() => getMarkerSize(props.element.shape?.lineHeadEnd))
-
-const shapeMarkerEndSize = computed(() => getMarkerSize(props.element.shape?.lineTailEnd))
 
 const shapeViewBox = computed(() => {
   const width = props.element.shape?.viewBoxWidth ?? props.element.bounds.width
@@ -190,28 +193,28 @@ const shouldRenderPlaceholder = computed(() => {
     >
       <defs>
         <marker
-          v-if="shapeMarkerStart"
+          v-if="shapeMarkerStart && shapeMarkerStartModel"
           :id="`${markerIdBase}-start`"
-          :markerWidth="shapeMarkerStartSize.width"
-          :markerHeight="shapeMarkerStartSize.height"
-          :refX="shapeMarkerStartSize.width"
-          :refY="shapeMarkerStartSize.height / 2"
-          orient="auto-start-reverse"
+          :markerWidth="shapeMarkerStartModel.markerWidth"
+          :markerHeight="shapeMarkerStartModel.markerHeight"
+          :refX="shapeMarkerStartModel.refX"
+          :refY="shapeMarkerStartModel.refY"
+          :orient="shapeMarkerStartModel.orient"
           markerUnits="strokeWidth"
         >
-          <path :d="`M 0 0 L ${shapeMarkerStartSize.width} ${shapeMarkerStartSize.height / 2} L 0 ${shapeMarkerStartSize.height} z`" :fill="shapeStroke" />
+          <path :d="shapeMarkerStartModel.path" :fill="shapeStroke" />
         </marker>
         <marker
-          v-if="shapeMarkerEnd"
+          v-if="shapeMarkerEnd && shapeMarkerEndModel"
           :id="`${markerIdBase}-end`"
-          :markerWidth="shapeMarkerEndSize.width"
-          :markerHeight="shapeMarkerEndSize.height"
-          :refX="shapeMarkerEndSize.width"
-          :refY="shapeMarkerEndSize.height / 2"
-          orient="auto"
+          :markerWidth="shapeMarkerEndModel.markerWidth"
+          :markerHeight="shapeMarkerEndModel.markerHeight"
+          :refX="shapeMarkerEndModel.refX"
+          :refY="shapeMarkerEndModel.refY"
+          :orient="shapeMarkerEndModel.orient"
           markerUnits="strokeWidth"
         >
-          <path :d="`M 0 0 L ${shapeMarkerEndSize.width} ${shapeMarkerEndSize.height / 2} L 0 ${shapeMarkerEndSize.height} z`" :fill="shapeStroke" />
+          <path :d="shapeMarkerEndModel.path" :fill="shapeStroke" />
         </marker>
       </defs>
       <path
@@ -262,6 +265,11 @@ const shouldRenderPlaceholder = computed(() => {
       :style="mediaStyle"
       :src="mediaSource"
       :alt="props.element.name"
+    />
+
+    <TableRenderer
+      v-else-if="props.element.type === 'table' && props.element.table"
+      :table="props.element.table"
     />
 
     <template v-else-if="props.element.type === 'group' && childElements.length">
@@ -409,23 +417,6 @@ function sanitizePresentationHtml(html?: string) {
   normalizeTextWhitespace(documentNode.body)
 
   return documentNode.body.innerHTML
-}
-
-function parseBorderWidth(border?: string) {
-  if (!border) {
-    return 0
-  }
-
-  const width = Number.parseFloat(border)
-  return Number.isFinite(width) ? width : 0
-}
-
-function parseBorderColor(border?: string) {
-  if (!border) {
-    return 'none'
-  }
-
-  return border.split(' ').find((part) => part.startsWith('#') || part.startsWith('rgb')) ?? 'none'
 }
 
 function mapVerticalAlign(vAlign?: string) {
@@ -604,26 +595,5 @@ function shouldRenderSvgShape(element: EvaluatedElementFrame) {
   }
 
   return element.shape.type !== 'rect' && element.shape.type !== 'roundRect'
-}
-
-function getMarkerSize(marker?: { width?: string; length?: string }) {
-  const width = mapMarkerSize(marker?.width)
-  const length = mapMarkerSize(marker?.length)
-
-  return {
-    width: length,
-    height: width,
-  }
-}
-
-function mapMarkerSize(value?: string) {
-  switch (value) {
-    case 'sm':
-      return 5
-    case 'lg':
-      return 9
-    default:
-      return 7
-  }
 }
 </script>

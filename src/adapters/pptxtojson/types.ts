@@ -93,6 +93,17 @@ export interface RawMediaRect {
   b?: number
 }
 
+export interface RawMotionPath {
+  xFrom?: number
+  yFrom?: number
+  xTo?: number
+  yTo?: number
+  xBy?: number
+  yBy?: number
+  rotateFrom?: number
+  rotateTo?: number
+}
+
 export interface RawPptxAnimation {
   id?: string | number
   trigger?: 'withPrevious' | 'afterPrevious' | 'onClick' | string
@@ -101,6 +112,7 @@ export interface RawPptxAnimation {
   effect?: 'appear' | 'fade' | string
   targetElementIds?: Array<string | number>
   targetElementId?: string | number
+  motionPath?: RawMotionPath
 }
 
 export interface RawPptxSlide {
@@ -113,7 +125,7 @@ export interface RawPptxSlide {
         type?: 'color' | 'gradient' | 'image' | 'pattern'
         value?: unknown
       }
-  transition?: { type?: string; durationMs?: number; duration?: number }
+  transition?: { type?: string; durationMs?: number; duration?: number; advTm?: number; advanceAfterMs?: number }
   elements?: RawPptxElement[]
   layoutElements?: RawPptxElement[]
   autoplay?: { advanceOnClick?: boolean; advanceAfterMs?: number }

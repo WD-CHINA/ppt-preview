@@ -60,6 +60,7 @@ PPTX File
 - image / video / audio / math 媒体
 - shape 元信息
 - 基础 animation 元数据
+- 最小 `motionPath` 描述符（translate/rotate）
 
 ### 2.2 基础 Runtime facade
 
@@ -115,6 +116,7 @@ PPTX File
 - `text`
 - `image`
 - `shape`
+- `table`（首批基础结构/文本/行列尺寸/单元格样式；已补基础 typography 字段）
 - `video`
 - `audio`
 - `math`
@@ -152,6 +154,8 @@ PPTX File
 - `rect / roundRect` 走 CSS 盒子渲染而不是 SVG path
 - shape 背景层与文本层拆开
 - media crop 的 CSS 渲染
+- line marker 已从“统一三角形”升级到最小 type-aware 渲染（`triangle / stealth / diamond / oval`），并通过独立 helper 输出 marker path/size/orient
+- `straightConnector1` 等 open line shape 已不再误把 `background` 当成 SVG fill；当前会把背景色回退为 stroke，使真实页中的箭头连线重新可见
 
 换句话说，当前项目已经开始形成“解析增强 + 归一化兜底 + 渲染层修正”的三层补丁体系。
 
@@ -193,46 +197,55 @@ Presentation Runtime Facade
 
 ### 3.2 Timeline 只有基础时序
 
-当前 `NormalizedAnimation` 与 evaluator 只支持：
+当前 `NormalizedAnimation` 与 evaluator 已支持：
 
 - `appear`
 - `fade`
 - `onClick`
 - `withPrevious`
 - `afterPrevious`
+- 最小 `motionPath` 描述符（`xFrom / yFrom / xTo / yTo / rotateFrom / rotateTo`）
+- `Timeline Engine` 纯函数输出 motion geometry：`progress / translateX / translateY / rotate`
+- `Evaluator` 将 motion geometry 投影到 `EvaluatedElementFrame.bounds`，并额外透出 `animationGeometry`
 
 仍然缺少：
 
 - entrance 动画细分效果
 - exit 动画
 - emphasis 动画
-- motion path
+- 真实 PPT 复杂 motion path（二次路径、多段 path、相对路径）
 - trigger group
 - 段落级触发
 - delay / easing / repeat
 - 更完整的动画时间线建模
 
-所以当前更像是“基础可见性/透明度调度”，不是完整 PPT timeline runtime。
+所以当前已不再只是“基础可见性/透明度调度”，而是进入了“基础可见性/透明度 + 最小 motion geometry”的阶段；但距离完整 PPT timeline runtime 还很远。
+
+补充：在真实 `4b00...pptx` 第 4 / 7 页 browser 复验中，connector 缺失的主因之一已被定位并修正：`straightConnector1` 这类 open line shape 过去把 `style.background` 当成 SVG fill，导致线身不可见而只剩 marker。当前 renderer 已改为 line-like shape 用背景色回退成 stroke、fill 设为 `none`，箭头/连线已重新可见；剩余问题主要收敛到 marker 精度、线长统一性和端点/文字锚点对齐。
+
+补充：在真实 `演示文稿1.pptx` 里，slide XML 的 `p:timing` 当前只有 timing root，没有对象级 timing children；因此它适合作为“页面转场 + 自动播放”回归样本，不适合作为对象入场动画解析样本。对象级 entrance animation 解析仍需另找包含 `anim/animEffect/seq` 等 timing children 的真实 PPTX。
 
 ### 3.3 Transition 只有简化过渡
 
 当前系统有：
 
 - transition 元数据
-- transition progress
-- `SlideViewport.vue` 中基础 opacity / transform 过渡
+- 通过 slide XML enhancer 回填 `advTm -> slide.autoplay.advanceAfterMs`
+- `transitionViewportModel.ts` 中针对 `fade / push / wipe` 的最小 typed viewport 中间态
+- `SlideViewport.vue` 中按 `transition.type` 派发对应的 opacity / translateX / clip-path 样式
+- Runtime / Evaluator 已修正 source-slide transition 语义：翻页中 current viewport 可是目标页内容，但 transition `type/duration` 必须继续取 source slide，不能错位一页
 
-但仍然没有按 `transition.type` 派发真实转场 renderer。
+但仍然没有形成完整的 Transition Engine renderer 分发系统。
 
-仍未形成独立的 Transition Engine，也还没有系统支持：
+仍未系统支持：
 
-- fade
-- push
+- push / wipe 的方向参数
 - cover
 - uncover
-- wipe
 - split
 - zoom
+- 更高保真的 easing / mask / clip 几何
+- 对照真实 PPT 的系统截图回归
 
 ### 3.4 Media 还没有生命周期调度
 
@@ -323,15 +336,15 @@ Presentation Runtime Facade
 
 类型层已经声明了：
 
-- `table`
+- `table`（已有首批基础 renderer）
 - `chart`
 - `diagram`
 
-但当前真正渲染层并没有完整 renderer。
+但当前复杂元素 renderer 仍不完整。
 
 这意味着：
 
-- table 还没做
+- table 已能渲染基础结构、文本、行列尺寸、cell span、基础 fill/font/border/vAlign，并已过滤 `hMerge / vMerge` continuation cell；fallback border 已按 row/column position 收敛以避免内部双线；基础 typography 已支持 `fontFamily / fontSize / fontItalic / fontUnderline`，且已对小字号 cell 增加首轮 `lineHeight/padding` 补强并把 `overflow-wrap` 从 `anywhere` 收紧为 `break-word`，又对单个长英文标签补了第二轮“缩小字号 + keep-all”策略，并在第三轮把列宽感知（`colWidths + columnIndex + colSpan`）纳入 typography 决策，第四轮开始读取 HTML paragraph 结构，对多段正文走单独的 line-height/padding 策略，第五轮开始读取 run 级 `font-size` 作为 effective font size 参与 typography bucket；已定位真实 table 页进入 fixture 索引，并已完成 `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 5 / 24 / 26 / 31 页、`AI Beatify Slides Example.pptx` 第 4 页、`83f822650ce0499c835780f673faed2b.pptx` 第 4 页的浏览器视觉冒烟验证；当前未见明显结构错位、重复渲染或内部双线，但 typography 仍是主问题，尤其是小字偏小、行高偏紧、英文单词断裂与局部裁切；真实页表明即使补了列宽感知、paragraph-aware 和 run-level font-size 规则，cell 级启发式仍不够，后续需要更完整的 paragraph/run 级策略；还缺完整 Office table theme/style、更完整的 cell padding/line-height/run 级 typography 与真实 PPT 截图回归
 - chart 还没做
 - diagram / SmartArt 类还没做
 
@@ -453,7 +466,7 @@ Presentation Runtime Facade
 
 - `TransitionStage`
 - `MediaRenderer`
-- table/chart/diagram renderer
+- chart/diagram renderer（`TableRenderer` 首批基础版已完成）
 - overlay layer
 - annotation / laser pointer
 - timeline scrubber
@@ -466,7 +479,7 @@ Presentation Runtime Facade
 
 1. **没有模块化 Runtime engine**
 2. **没有完整 Timeline / Transition / Media 系统**
-3. **没有 table/chart/diagram renderer**
+3. **复杂元素 renderer 仍不完整（table 首批基础版已完成，chart/diagram 未做）**
 4. **没有回归测试和视觉基准**
 
 这 4 项决定了项目是否能从“持续 patch 某些 PPT”走向“稳定支持一批 PPT 模板”。
@@ -510,9 +523,16 @@ Presentation Runtime Facade
 
 ### P3：补复杂元素 renderer
 
+当前进展：
+
+- `table` 首批基础版已完成：`NormalizedTableMeta`、`TableRenderer.vue`、`tableModel.ts`、normalize/tableModel 合成测试
+- `table` 第二批合并单元格补强已完成：过滤 `hMerge / vMerge` continuation cell，并已扫描真实 PPTX table 页写入 fixture 索引
+- `table` 第三批边框补强已完成：fallback border 由 `tableModel.ts` 按 row/column position 生成，避免 CSS class 四边框造成内部双线
+- `table` 第四批真实页验证已完成：浏览器加载 `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 24 页，table 结构可读且 console 无错误；底部说明文字偏小/换行紧，归入后续 table cell typography
+
 优先顺序建议：
 
-1. table
+1. table 完整度补强（Office table theme/style、合并隐藏项、真实 PPT 截图回归）
 2. chart
 3. diagram / SmartArt
 
@@ -711,14 +731,14 @@ Presentation Runtime Facade
 
 建议交付物：
 
-- `TableRenderer`
+- `TableRenderer`（首批基础版已完成：结构/文本/行列尺寸/基础 cell 样式；第二批已补 `hMerge / vMerge` continuation 过滤与真实 table 页索引；第三批已补 fallback border collapse；第四批已做真实页浏览器冒烟验证；第五批已补基础 typography 字段；第六批已补 `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 26 / 31 页浏览器冒烟验证；第七批已完成剩余真实 table 页验证并补小字号 typography 首轮策略；仍需完整 table theme、cell padding/line-height/run 级 typography 与真实 PPT 截图回归）
 - `ChartRenderer`
 - `DiagramRenderer`
 - 对应 fixture 与回归样例
 
 建议优先顺序：
 
-1. `table`
+1. `table` 完整度补强
 2. `chart`
 3. `diagram`
 
@@ -779,7 +799,7 @@ Presentation Runtime Facade
 2. 拆 enhancer
 3. 拆 runtime facade
 4. 补 timeline / transition / media
-5. 补 table
+5. 补 table 完整度
 6. 再补 chart / diagram / presenter 增强
 
 这条路线的核心是：

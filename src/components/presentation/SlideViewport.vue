@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import ElementRenderer from './ElementRenderer.vue'
 import type { EvaluatedSlideFrame } from '../../types/presentation'
+import { getTransitionViewportStyle } from './transitionViewportModel'
 
 const props = defineProps<{
   slide?: EvaluatedSlideFrame
@@ -10,6 +11,7 @@ const props = defineProps<{
   active?: boolean
   transitionProgress?: number
   transitionRole?: 'current' | 'previous'
+  transitionType?: string
 }>()
 
 const viewportStyle = computed(() => {
@@ -23,23 +25,16 @@ const viewportStyle = computed(() => {
         : props.slide?.background.color ?? '#ffffff'),
   }
 
-  if (props.transitionRole === 'previous') {
-    return {
-      ...base,
-      opacity: 1 - (props.transitionProgress ?? 1),
-      transform: `scale(${1 - (props.transitionProgress ?? 1) * 0.02})`,
-    }
+  return {
+    ...base,
+    ...getTransitionViewportStyle({
+      transitionType: props.transitionType,
+      role: props.transitionRole,
+      progress: props.transitionProgress,
+      width: props.width,
+      height: props.height,
+    }),
   }
-
-  if (props.transitionRole === 'current') {
-    return {
-      ...base,
-      opacity: props.transitionProgress ?? 1,
-      transform: `translateY(${(1 - (props.transitionProgress ?? 1)) * 18}px)`,
-    }
-  }
-
-  return base
 })
 </script>
 

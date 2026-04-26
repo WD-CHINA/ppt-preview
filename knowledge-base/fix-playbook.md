@@ -134,11 +134,18 @@
 - 解析 line XML 上的 `a:headEnd / a:tailEnd`
 - 注入 shape meta
 - 用 SVG marker 渲染头尾箭头
+- 不要把所有 marker 都画成同一种三角形；至少先按 `triangle / stealth / diamond / oval` 区分 marker path，并保留 start/end 不同 orient 语义
+- 将 marker path / size / refX / refY 提取到独立 helper，避免 `ElementRenderer.vue` 再次堆积路径细节
+- 对 `straightConnector1` 这类 open line shape，不要继续把 `style.background` 当成 SVG fill；若缺显式 border，应把背景色回退为 stroke，并让 fill 为 `none`，否则浏览器只会看到箭头头而看不到线身
 
 代码落点：
 
 - [src/adapters/pptxtojson/textBodyInsets.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/textBodyInsets.ts)
 - [src/components/presentation/ElementRenderer.vue](/Applications/work/ppt-preview/src/components/presentation/ElementRenderer.vue)
+- [src/components/presentation/lineMarkerModel.ts](/Applications/work/ppt-preview/src/components/presentation/lineMarkerModel.ts)
+- [src/components/presentation/lineMarkerModel.test.ts](/Applications/work/ppt-preview/src/components/presentation/lineMarkerModel.test.ts)
+- [src/components/presentation/shapeSvgModel.ts](/Applications/work/ppt-preview/src/components/presentation/shapeSvgModel.ts)
+- [src/components/presentation/shapeSvgModel.test.ts](/Applications/work/ppt-preview/src/components/presentation/shapeSvgModel.test.ts)
 
 ### 4.2 `rect / roundRect` 不要误走 SVG path
 
@@ -274,9 +281,63 @@
 - enhancer-level 真实 slide XML fixture
 - raw element 扩展字段统一类型化
 
-## 8. Runtime Engine 拆分类
+## 7. 表格渲染类
 
-### 7.1 先抽 `Session Store` 与 `Playback Policy`，不要一口气重写 Runtime
+### 7.1 表格先标准化为 `NormalizedTableMeta`，Renderer 只消费稳定模型
+
+适用问题：
+
+- `pptxtojson` 已输出 `table`，但播放器只显示占位
+- 表格文字不可读，行列尺寸和单元格样式丢失
+
+实践方案：
+
+- normalize 阶段把 `data / rowHeights / colWidths` 转成 `NormalizedTableMeta`
+- 继续沿用 point -> CSS px 的长度转换，避免 renderer 再理解 pptxtojson 单位
+- `TableRenderer` 只负责按 CSS grid 渲染行列、cell span、基础填充/字体/边框/垂直对齐
+- `hMerge / vMerge` 是合并单元格的 continuation cell，渲染前要过滤掉；origin cell 继续通过 `colSpan / rowSpan` 占位，否则 CSS grid 会被重复单元格撑乱
+- fallback border 不要继续写在 `.table-renderer__cell` CSS class 上，否则每个单元格四边都会叠加出双倍内部线；应由 `tableModel.ts` 根据 row/column position 只渲染 top/left 外边框和所有 right/bottom 边，显式 cell border 优先覆盖 fallback
+- table cell typography 也必须先进入 normalize 稳定模型，再由 `tableModel.ts` 映射为 CSS：本轮已覆盖 `fontFamily / fontSize / fontItalic / fontUnderline`。其中字号继续按 point -> CSS px 转换；如果遇到 XML hundredths-of-a-point 形式的 `sz`，先除以 100 再转换。
+- 小字号 table typography 首轮补强不要只靠 CSS class 上的统一 `line-height: 1.2` 和 `overflow-wrap: anywhere`。这会让英文单词更容易被硬拆分、正文显得更挤。当前更稳妥的做法是：在 `tableModel.ts` 里按 cell `fontSize` 输出 typography 样式——`fontSize <= 16px` 时用 `lineHeight: 1.35`、`padding: 6px 8px`；`TableRenderer.vue` 则把 `overflow-wrap` 收紧为 `break-word`，先降低单词断裂概率。
+- 对单个长英文标签，第二轮补强不能只继续放宽 `line-height`。当前更有效的最小策略是：先检测“清洗 HTML 后无空格且长度 >= 10”的 cell 文本，再在 `tableModel.ts` 里把字号下调到 `fontSize * 0.9`，同时输出 `wordBreak: keep-all`、`overflowWrap: normal`。这能让 `INTERMEDIATE` 这类表头先优先尝试缩小，而不是立即硬拆词；但真实页验证表明，这一步只有小幅改善，后续仍需要列宽感知或 run 级 typography。
+- 第三轮补强把“列宽”也纳入 typography 决策：`getTableCellStyle()` 接受 `table` 上下文后，可以结合 `position.columnIndex + colSpan + table.colWidths` 估算 cell 可用宽度。当前最小规则是：如果单个长英文标签落在 `<= 72px` 的窄列里，则进一步收紧到 `fontSize * 0.8`、`lineHeight: 1.15`、`padding: 4px 5px`，继续优先争取整词显示。
+- 第四轮补强开始读取 paragraph 结构，而不是只看纯文本长度：当前最小规则是，若 table cell HTML 中 `<p>` 数量 > 1 且字号 `<= 16px`，则把 `lineHeight` 提到 `1.5`、padding 提到 `7px 8px`，并显式输出 `wordBreak: normal`、`overflowWrap: break-word`。这对多段正文的拥挤感和底部裁切风险有一定缓解，但仍不是 run 级排版。
+- 第五轮补强开始读取 run 级 `font-size`：当前最小规则是从 table cell HTML 里提取所有内联 `font-size: Npx`，取最大 run 字号作为 effective font size，再参与 typography 分层决策。这样带大标题 run 的 cell 不会继续被按小字号正文处理。这个能力当前先用于 typography bucket 决策，还没有深入到 run 级逐段布局。
+- 首轮只覆盖“结构可见、文本可读、尺寸基本正确”，不把完整 Office 表格主题系统塞进 renderer
+
+代码落点：
+
+- [src/types/presentation.ts](/Applications/work/ppt-preview/src/types/presentation.ts)
+- [src/adapters/pptxtojson/normalizePresentation.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/normalizePresentation.ts)
+- [src/components/presentation/TableRenderer.vue](/Applications/work/ppt-preview/src/components/presentation/TableRenderer.vue)
+- [src/components/presentation/tableModel.ts](/Applications/work/ppt-preview/src/components/presentation/tableModel.ts)
+
+验证：
+
+- `pnpm test:run src/adapters/pptxtojson/normalizePresentation.test.ts src/components/presentation/tableModel.test.ts`
+- `pnpm test:run`
+- `pnpm build`
+
+真实 fixture 入口：
+
+- [fixtures/table-regression-cases.md](/Applications/work/ppt-preview/fixtures/table-regression-cases.md)
+
+视觉冒烟验证记录：
+
+- `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 24 页：table 结构可读，未见明显内部双线；底部说明文字偏小且换行较紧，归入后续 text/table cell typography 完整度问题。
+- `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 26 页：5 x 6 planning table 结构对齐正常，未见明显重复渲染、内部双线或布局破坏；但单元格小字在舞台预览中仍偏小。
+- `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 31 页：4 x 5 tasks table 文字可读、边框网格稳定，未见明显内部双线或布局破坏。
+- `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 5 页：结构稳定、无明显双线或重复渲染，但 `INTERMEDIATE` 等英文仍有硬拆分；说明小字号 typography 首轮补强有效但还不够。
+- `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 5 页（二轮验证）：单个长英文标签缩小字号 + 禁止硬拆词后只有小幅改善，`INTERMEDIATE` 仍会被拆；说明问题不能只靠全局 CSS，需要结合列宽或更细的 run 级信息。
+- `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 5 页（三轮验证）：列宽感知后表头拆词继续小幅改善，但 `INTERMEDIATE` 仍未彻底解决；说明 cell 级列宽启发式也只是过渡方案，下一步应转 paragraph/run 级 typography。
+- `AI Beatify Slides Example.pptx` 第 4 页（四轮验证）：多段正文观感更松，说明 paragraph-aware typography 有帮助；但底部仍有轻微裁切风险，说明后续还要下沉到 run 级信息。
+- run 级字号感知当前已经有 synthetic test 基线，但真实页收益暂不明显；至少现阶段未观察到新的双线、重复渲染或 JS error，因此可以保留该能力作为后续 run 级排版的基础，而不把它误判为已经足够解决真实页 typography。
+- `AI Beatify Slides Example.pptx` 第 4 页：结构基本正确，但字号偏小、文本拥挤、局部有裁切感；当前主问题仍是 line-height / padding / run 级换行。
+- `83f822650ce0499c835780f673faed2b.pptx` 第 4 页：结构稳定、无明显双线/重复渲染，但小字偏小、行高偏紧。
+
+## 8. Runtime Engine 拆分
+
+### 8.1 先抽 `Session Store` 与 `Playback Policy`，不要一口气重写 Runtime
 
 适用问题：
 
@@ -330,6 +391,47 @@ pnpm build
 - [src/runtime/timeline/timelineEngine.test.ts](/Applications/work/ppt-preview/src/runtime/timeline/timelineEngine.test.ts)
 - [src/runtime/evaluatePresentationFrame.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.ts)
 
+### 7.6 `Timeline Engine` 先补最小 `motionPath` 描述符，不要直接跳到完整 PPT 动画系统
+
+适用问题：
+
+- 连线/箭头类元素即使拿到了 animation，也只能做基础 visible/opacity，无法推进几何位移
+- `evaluatePresentationFrame.ts` 没有稳定的 line-specific geometry 输出，后续 connector/marker 高保真渲染缺接口
+
+实践方案：
+
+- 先在标准化层给 `NormalizedAnimation` 增加最小 `motionPath` 描述符：
+  - `xFrom / yFrom`
+  - `xTo / yTo`
+  - `rotateFrom / rotateTo`
+- `timelineEngine.ts` 继续保持纯函数，新增 `evaluateAnimationGeometry()`，统一根据 trigger/timeline 计算：
+  - `progress`
+  - `translateX`
+  - `translateY`
+  - `rotate`
+- `evaluatePresentationFrame.ts` 不直接理解 raw animation，而是：
+  - 聚合 target animations
+  - 将 `motionPath` 投影到 `EvaluatedElementFrame.bounds`
+  - 同时透出 `animationGeometry`，给 line/connector renderer 和后续 motion-path/marker fidelity 补强复用
+- 当前阶段只先支持合成 fixture 驱动的最小 translate/rotate 模型；真实 PPT 的复杂 motion path、easing、repeat 和多段 path 仍后续再补
+
+代码落点：
+
+- [src/adapters/pptxtojson/types.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/types.ts)
+- [src/adapters/pptxtojson/normalizePresentation.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/normalizePresentation.ts)
+- [src/runtime/timeline/timelineEngine.ts](/Applications/work/ppt-preview/src/runtime/timeline/timelineEngine.ts)
+- [src/runtime/evaluatePresentationFrame.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.ts)
+- [src/runtime/timeline/timelineEngine.test.ts](/Applications/work/ppt-preview/src/runtime/timeline/timelineEngine.test.ts)
+- [src/runtime/evaluatePresentationFrame.test.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.test.ts)
+- [src/adapters/pptxtojson/normalizePresentation.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/normalizePresentation.test.ts)
+
+验证命令：
+
+```bash
+pnpm test:run src/adapters/pptxtojson/normalizePresentation.test.ts src/runtime/timeline/timelineEngine.test.ts src/runtime/evaluatePresentationFrame.test.ts
+pnpm build
+```
+
 ### 7.3 `Transition Engine` 先承接状态写入，不急着做 typed renderer
 
 适用问题：
@@ -352,6 +454,46 @@ pnpm build
 - [src/runtime/transition/transitionEngine.test.ts](/Applications/work/ppt-preview/src/runtime/transition/transitionEngine.test.ts)
 - [src/runtime/createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts)
 
+### 7.3a 先从 slide XML 回填 `advTm`，再在 `SlideViewport` 做最小 typed transition style
+
+适用问题：
+
+- `pptxtojson` 当前可给出 `transition.type / durationMs`，但会漏掉 `p:transition advTm`，导致 runtime 自动翻页节奏丢失
+- `SlideViewport.vue` 之前无论什么转场都只走同一套 opacity/translateY 样式，无法区分 `fade / push / wipe`
+
+实践方案：
+
+- 新增 `enhancers/slide-transitions.ts`，直接从 slide XML 读取 `p:transition`：
+  - 子节点类型（如 `fade / push / wipe`）
+  - `spd`
+  - `advTm`
+- 在 `textBodyInsets.ts` orchestration 里把 transition metadata 回填到 raw slide；再由 `normalizePresentation.ts` 把 `transition.advanceAfterMs/advTm` 归一化到 `slide.autoplay.advanceAfterMs`
+- 新增 `transitionViewportModel.ts`，先以纯函数方式对 `fade / push / wipe` 输出最小 viewport 中间态样式：
+  - `fade`：延续当前 crossfade
+  - `push`：previous/current 双 viewport 水平推进
+  - `wipe`：current viewport 用 `clip-path` 逐步揭示
+- 先把页面转场与 autoplay 节奏跑通；对象级 entrance animation 解析另行处理，不和这一刀混写
+
+代码落点：
+
+- [src/adapters/pptxtojson/enhancers/slide-transitions.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/slide-transitions.ts)
+- [src/adapters/pptxtojson/enhancers/slide-transitions.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/slide-transitions.test.ts)
+- [src/adapters/pptxtojson/textBodyInsets.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/textBodyInsets.ts)
+- [src/adapters/pptxtojson/normalizePresentation.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/normalizePresentation.ts)
+- [src/adapters/pptxtojson/normalizePresentation.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/normalizePresentation.test.ts)
+- [src/components/presentation/transitionViewportModel.ts](/Applications/work/ppt-preview/src/components/presentation/transitionViewportModel.ts)
+- [src/components/presentation/transitionViewportModel.test.ts](/Applications/work/ppt-preview/src/components/presentation/transitionViewportModel.test.ts)
+- [src/components/presentation/SlideViewport.vue](/Applications/work/ppt-preview/src/components/presentation/SlideViewport.vue)
+- [src/components/presentation/PresentationStage.vue](/Applications/work/ppt-preview/src/components/presentation/PresentationStage.vue)
+- [src/runtime/evaluatePresentationFrame.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.ts)
+
+验证命令：
+
+```bash
+pnpm test:run src/adapters/pptxtojson/enhancers/slide-transitions.test.ts src/adapters/pptxtojson/normalizePresentation.test.ts src/components/presentation/transitionViewportModel.test.ts
+pnpm build
+```
+
 ### 7.4 Facade 层必须保护 transition 中的导航入口
 
 适用问题：
@@ -368,6 +510,28 @@ pnpm build
 
 - [src/runtime/createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts)
 - [src/runtime/createPresentationRuntime.test.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.test.ts)
+
+### 7.4a 翻页中的 transition type / duration 要取 source slide，不要取 destination slide
+
+适用问题：
+
+- 浏览器里每一页转场看起来都“慢一页”或类型错位：例如 `slide1=fade, slide2=push`，从第 1 页翻到第 2 页时却渲染成 push
+- tick 进度和 evaluator transitionType 都跟着目标页走，导致整份 deck 的转场语义 off-by-one
+
+实践方案：
+
+- `createPresentationRuntime.goToSlide()` 开始 transition 前，先读取 `fromSlide` 的 `transition.durationMs`
+- `beginSlideTransition()` 与 `tickSlideTransition()` 期间都沿用 `transitionFromSlideIndex` 指向的 source slide 元数据
+- `evaluatePresentationFrame()` 在 `isTransitioning` 时用 `transitionFromSlideIndex` 读取 `transitionType`，只把 current viewport 内容切到 destination slide
+- 增加 facade/evaluator 回归测试，锁住“内容已切到目标页，但转场元数据仍属于 source slide”的语义
+
+代码落点：
+
+- [src/runtime/createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts)
+- [src/runtime/createPresentationRuntime.test.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.test.ts)
+- [src/runtime/transition/transitionEngine.ts](/Applications/work/ppt-preview/src/runtime/transition/transitionEngine.ts)
+- [src/runtime/evaluatePresentationFrame.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.ts)
+- [src/runtime/evaluatePresentationFrame.test.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.test.ts)
 
 ### 7.5 `Media Engine` 先做 registry/cache/playback plan，再接 DOM 控制
 

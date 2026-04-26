@@ -1,14 +1,16 @@
 import type {
+  EvaluatedAnimationGeometry,
   EvaluatedElementFrame,
   EvaluatedMediaFrame,
   EvaluatedSlideFrame,
+  NormalizedAnimation,
   NormalizedElement,
   NormalizedPresentation,
   NormalizedSlide,
   PresentationFrame,
   PresentationRuntimeState,
 } from '../types/presentation'
-import { evaluateAnimationVisibility } from './timeline/timelineEngine'
+import { evaluateAnimationGeometry, evaluateAnimationVisibility } from './timeline/timelineEngine'
 
 export function evaluatePresentationFrame(
   model: NormalizedPresentation,
@@ -23,6 +25,9 @@ export function evaluatePresentationFrame(
     currentSlideIndex,
     isTransitioning,
     transitionProgress: state.transitionProgress,
+    transitionType: isTransitioning
+      ? model.slides[state.transitionFromSlideIndex ?? currentSlideIndex]?.transition?.type
+      : undefined,
     previous: isTransitioning
       ? evaluateSlideFrame(model.slides[state.transitionFromSlideIndex ?? -1])
       : evaluateSlideFrame(model.slides[currentSlideIndex - 1]),
@@ -88,6 +93,13 @@ function evaluateElementFrame(
   state?: PresentationRuntimeState,
 ): EvaluatedElementFrame {
   const animationState = state ? evaluateElementAnimationState(slide, element.id, state) : { visible: true, opacity: 1 }
+  const animationGeometry = state ? evaluateElementAnimationGeometry(slide, element.id, state) : undefined
+  const evaluatedBounds = {
+    ...element.bounds,
+    x: element.bounds.x + (animationGeometry?.translateX ?? 0),
+    y: element.bounds.y + (animationGeometry?.translateY ?? 0),
+    rotate: element.bounds.rotate + (animationGeometry?.rotate ?? 0),
+  }
 
   return {
     id: element.id,
@@ -96,13 +108,15 @@ function evaluateElementFrame(
     order: element.order,
     visible: animationState.visible,
     opacity: animationState.opacity,
-    transform: `translate(${element.bounds.x}px, ${element.bounds.y}px) rotate(${element.bounds.rotate}deg)`,
+    transform: `translate(${evaluatedBounds.x}px, ${evaluatedBounds.y}px) rotate(${evaluatedBounds.rotate}deg)`,
     style: element.style,
     text: element.text,
     html: element.html,
     media: element.media,
-    bounds: element.bounds,
+    bounds: evaluatedBounds,
+    animationGeometry,
     shape: element.shape,
+    table: element.table,
     children: element.children?.map((child) => evaluateElementFrame(slide, child, state)),
   }
 }
@@ -112,11 +126,49 @@ function evaluateElementAnimationState(
   elementId: string,
   state: PresentationRuntimeState,
 ) {
-  const animation = slide.animations.find((candidate) => candidate.targetElementIds.includes(elementId))
+  const animations = getTargetAnimations(slide, elementId)
 
-  if (!animation) {
+  if (animations.length === 0) {
     return { visible: true, opacity: 1 }
   }
 
-  return evaluateAnimationVisibility(animation, slide.animations, state)
+  return animations.reduce(
+    (current, animation) => {
+      if (animation.effect !== 'appear' && animation.effect !== 'fade') {
+        return current
+      }
+
+      return evaluateAnimationVisibility(animation, slide.animations, state)
+    },
+    { visible: true, opacity: 1 },
+  )
+}
+
+function evaluateElementAnimationGeometry(
+  slide: NormalizedSlide,
+  elementId: string,
+  state: PresentationRuntimeState,
+): EvaluatedAnimationGeometry | undefined {
+  const animations = getTargetAnimations(slide, elementId)
+  const geometryStates = animations
+    .map((animation) => evaluateAnimationGeometry(animation, slide.animations, state))
+    .filter((geometry): geometry is EvaluatedAnimationGeometry => geometry != null)
+
+  if (geometryStates.length === 0) {
+    return undefined
+  }
+
+  return geometryStates.reduce(
+    (combined, geometry) => ({
+      progress: Math.max(combined.progress, geometry.progress),
+      translateX: combined.translateX + geometry.translateX,
+      translateY: combined.translateY + geometry.translateY,
+      rotate: combined.rotate + geometry.rotate,
+    }),
+    { progress: 0, translateX: 0, translateY: 0, rotate: 0 },
+  )
+}
+
+function getTargetAnimations(slide: NormalizedSlide, elementId: string): NormalizedAnimation[] {
+  return slide.animations.filter((candidate) => candidate.targetElementIds.includes(elementId))
 }
