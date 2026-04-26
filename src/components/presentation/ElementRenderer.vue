@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import type { CSSProperties } from 'vue'
 import type { EvaluatedElementFrame } from '../../types/presentation'
 import TableRenderer from './TableRenderer.vue'
+import MediaRenderer from './MediaRenderer.vue'
 import { createLineMarkerModel } from './lineMarkerModel'
 import { getShapeSvgPaintModel } from './shapeSvgModel'
 
@@ -32,39 +33,13 @@ const elementStyle = computed<CSSProperties>(() => {
   }
 })
 
-const mediaSource = computed(() => {
-  const inlineBlob = typeof props.element.media?.blob === 'string' ? props.element.media.blob : ''
-  return props.element.media?.objectUrl ?? inlineBlob ?? props.element.media?.src ?? ''
-})
-
-const mediaStyle = computed<CSSProperties>(() => {
-  const crop = props.element.media?.crop
-
-  if (!crop) {
-    return {}
-  }
-
-  const visibleWidth = Math.max(1 - crop.left - crop.right, 0.01)
-  const visibleHeight = Math.max(1 - crop.top - crop.bottom, 0.01)
-
-  return {
-    position: 'absolute',
-    width: `${100 / visibleWidth}%`,
-    height: `${100 / visibleHeight}%`,
-    maxWidth: 'none',
-    maxHeight: 'none',
-    left: `${(-crop.left / visibleWidth) * 100}%`,
-    top: `${(-crop.top / visibleHeight) * 100}%`,
-    objectFit: 'fill',
-  }
-})
-
 const sanitizedHtml = computed(() => sanitizePresentationHtml(props.element.html))
+const resolvedHtml = computed(() => props.element.renderedHtml ?? sanitizedHtml.value ?? props.element.text ?? '')
 
 const textClass = computed(() => ({
   'element-text': true,
   'element-text--single-line': isShortSingleLineText(
-    sanitizedHtml.value,
+    resolvedHtml.value,
     props.element.text,
     props.element.bounds.width,
     props.element.style.fontSize,
@@ -173,10 +148,6 @@ const shouldRenderPlaceholder = computed(() => {
     return false
   }
 
-  if (props.element.type === 'image' || props.element.type === 'video' || props.element.type === 'audio' || props.element.type === 'math') {
-    return !mediaSource.value
-  }
-
   return !shouldRenderText.value
 })
 </script>
@@ -231,41 +202,9 @@ const shouldRenderPlaceholder = computed(() => {
 
     <div v-else-if="props.element.type === 'shape'" class="element-shape" :style="shapeLayerStyle"></div>
 
-    <div v-if="shouldRenderText" :class="textClass" :style="textBoxStyle" v-html="sanitizedHtml || props.element.text"></div>
+    <div v-if="shouldRenderText" :class="textClass" :style="textBoxStyle" v-html="resolvedHtml"></div>
 
-    <img
-      v-else-if="props.element.type === 'image' && mediaSource"
-      class="element-media"
-      :style="mediaStyle"
-      :src="mediaSource"
-      :alt="props.element.name"
-    />
-
-    <video
-      v-else-if="props.element.type === 'video' && mediaSource"
-      class="element-media"
-      :src="mediaSource"
-      :poster="props.element.media?.poster"
-      :muted="true"
-      preload="metadata"
-      controls
-    />
-
-    <audio
-      v-else-if="props.element.type === 'audio' && mediaSource"
-      class="element-audio"
-      :src="mediaSource"
-      preload="metadata"
-      controls
-    />
-
-    <img
-      v-else-if="props.element.type === 'math' && mediaSource"
-      class="element-media"
-      :style="mediaStyle"
-      :src="mediaSource"
-      :alt="props.element.name"
-    />
+    <MediaRenderer v-else-if="props.element.type === 'image' || props.element.type === 'video' || props.element.type === 'audio' || props.element.type === 'math'" :element="props.element" />
 
     <TableRenderer
       v-else-if="props.element.type === 'table' && props.element.table"

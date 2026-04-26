@@ -207,6 +207,7 @@ Presentation Runtime Facade
 - 最小 `motionPath` 描述符（`xFrom / yFrom / xTo / yTo / rotateFrom / rotateTo`）
 - `Timeline Engine` 纯函数输出 motion geometry：`progress / translateX / translateY / rotate`
 - `Evaluator` 将 motion geometry 投影到 `EvaluatedElementFrame.bounds`，并额外透出 `animationGeometry`
+- `Evaluator` 还会把最小 paragraph build 可见性投影到 `EvaluatedElementFrame.renderedHtml`，用来支持逐条出现的文本段落回放
 
 仍然缺少：
 
@@ -223,9 +224,9 @@ Presentation Runtime Facade
 
 补充：在真实 `4b00...pptx` 第 4 / 7 页 browser 复验中，connector 缺失的主因之一已被定位并修正：`straightConnector1` 这类 open line shape 过去把 `style.background` 当成 SVG fill，导致线身不可见而只剩 marker。当前 renderer 已改为 line-like shape 用背景色回退成 stroke、fill 设为 `none`，箭头/连线已重新可见；剩余问题主要收敛到 marker 精度、线长统一性和端点/文字锚点对齐。
 
-补充：在真实 `演示文稿1.pptx` 里，slide XML 的 `p:timing` 当前只有 timing root，没有对象级 timing children；因此它适合作为“页面转场 + 自动播放”回归样本，不适合作为对象入场动画解析样本。对象级 entrance animation 解析仍需另找包含 `anim/animEffect/seq` 等 timing children 的真实 PPTX。
+补充：在真实 `演示文稿1.pptx` 里，slide XML 的 `p:timing` 当前只有 timing root，没有对象级 timing children；因此它适合作为“页面转场 + 自动播放”回归样本，不适合作为对象入场动画解析样本。对象级 entrance animation 解析仍需另找包含 `anim/animEffect/seq` 等 timing children，或至少包含 `p:bldLst` / `bldP` 的真实 PPTX。
 
-补充：但这条判断现在必须和真实 WPS 对照分开写。macOS 权限打开后，已经可以用 `osascript + screencapture + ffmpeg(avfoundation)` 直接录制 WPS 放映；该链路下，`演示文稿1.pptx` 仍会给出“第 2 张内容按顺序出现”“slide3 -> slide4 的视觉过渡不像当前浏览器里的固定 wipe 边界”这类用户可感知差异。当前更准确的说法应是：**当前 parser/runtime 没有从这份二进制里读出对象级动画，也还没把转场视觉还原对齐到 WPS；但不能再把它表述成‘文件本身没有这些效果’。** 另外，上游 `pptxtojson@2.0.2` 源码当前只实现了 `p:transition` 解析，没有对象级 timing/build parser，因此对象动画解析缺口不仅在这份样本，也在当前 parser 能力本身。当前仓库已经补了一个最小 timing parser 切片：可从 slide XML 的 `p:timing` 中提取 `clickEffect / withEffect / afterEffect`、`spTgt spid`、`cBhvr > cTn dur` 以及可选 `p:pRg st`，并注入 `slide.animations`；这足以覆盖 `47e66b31...pptx` 一类 click-triggered timing 样本，但距离完整 paragraph build / `bldLst` / Office 对象动画仍有明显差距。
+补充：但这条判断现在必须和真实 WPS 对照分开写。macOS 权限打开后，已经可以用 `osascript + screencapture + ffmpeg(avfoundation)` 直接录制 WPS 放映；该链路下，`演示文稿1.pptx` 仍会给出“第 2 张内容按顺序出现”“slide3 -> slide4 的视觉过渡不像当前浏览器里的固定 wipe 边界”这类用户可感知差异。当前更准确的说法应是：**当前 parser/runtime 没有从这份二进制里读出对象级动画，也还没把转场视觉还原对齐到 WPS；但不能再把它表述成‘文件本身没有这些效果’。** 另外，上游 `pptxtojson@2.0.2` 源码当前只实现了 `p:transition` 解析，没有对象级 timing/build parser，因此对象动画解析缺口不仅在这份样本，也在当前 parser 能力本身。当前仓库已经补了一个最小 timing parser 切片：可从 slide XML 的 `p:timing` 中提取 `clickEffect / withEffect / afterEffect`、`spTgt spid`、`cBhvr > cTn dur` 以及可选 `p:pRg st`，并额外扫描 `p:bldLst / bldP` 的最小 paragraph build 注入 `slide.animations`；这足以覆盖 `47e66b31...pptx` 一类 click-triggered timing 样本，但距离完整 paragraph build / Office 对象动画仍有明显差距。
 
 ### 3.3 Transition 只有简化过渡
 
@@ -245,11 +246,9 @@ Presentation Runtime Facade
 
 仍未系统支持：
 
+- cover / uncover / split / zoom 的真实页视觉回归与完整 renderer 语义（当前 `transitionViewportModel` 只给了最小占位/近似行为，`zoom` 仍未实现）
 - wipe 的更系统视觉回归（方向虽已支持，但还没做真实页中间态对照）
-- cover
-- uncover
-- split
-- zoom
+- random 转场的专门 renderer 语义（parser 已能读到 `p14:dur`，renderer 侧仅作中性 crossfade fallback）
 - 更高保真的 easing / mask / clip 几何
 - 对照真实 PPT 的系统截图回归
 
@@ -261,19 +260,20 @@ Presentation Runtime Facade
 - 释放旧 presentation 的 object URL
 - image / video / audio / math 的基础渲染
 - MIME 修正和部分资源兜底
+- runtime / media engine teardown 时的 object URL revoke
+- `MediaRenderer.vue` 抽离出的媒体渲染边界
 
-但还没有形成架构文档要求的 Media Engine。
+但还没有形成架构文档要求的完整 Media Engine（目前已具备 registry / cache window / playback plan / transition-aware media retention 的最小切片，且已开始把 `play/pause/mute/seek` 同步到 DOM 媒体元素；后续还要补媒体加载失败 fallback、poster/首帧与懒加载）。
 
 仍然缺少：
 
-- 媒体注册表
-- preload current / next
-- release far slides
-- video/audio 与 runtime play/pause 同步
-- video/audio seek / mute 同步
-- 媒体加载失败 fallback
+- 加载失败 fallback 的系统化处理
 - poster / 首帧策略
 - 大媒体懒加载
+- 更细的 object URL / 缓存释放策略（当前只有 teardown 级 revoke）
+- `MediaRenderer` 独立化
+- 更完整的 preload current / next policy
+- 更完整的 slide-aware media eviction policy
 
 ### 3.5 Evaluator 还只是基础 frame evaluator
 

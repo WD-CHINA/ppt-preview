@@ -54,6 +54,58 @@ describe('transitionViewportModel', () => {
     })
   })
 
+  it('treats cover transitions like a current slide that covers the previous slide', () => {
+    expect(getTransitionViewportStyle({ transitionType: 'cover', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      opacity: 1,
+      transform: 'translateX(960px)',
+      transition: 'none',
+    })
+    expect(getTransitionViewportStyle({ transitionType: 'cover', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      opacity: 1,
+      transform: 'none',
+      transition: 'none',
+    })
+  })
+
+  it('treats uncover transitions like the previous slide moves away while the current slide stays put', () => {
+    expect(getTransitionViewportStyle({ transitionType: 'uncover', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      opacity: 1,
+      transform: 'none',
+      transition: 'none',
+    })
+    expect(getTransitionViewportStyle({ transitionType: 'uncover', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      opacity: 1,
+      transform: 'translateX(-320px)',
+      transition: 'none',
+    })
+  })
+
+  it('keeps split transitions neutral until a dedicated renderer exists', () => {
+    expect(getTransitionViewportStyle({ transitionType: 'split', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      opacity: 1,
+      transform: 'none',
+      transition: 'none',
+    })
+    expect(getTransitionViewportStyle({ transitionType: 'split', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      opacity: 1,
+      transform: 'none',
+      transition: 'none',
+    })
+  })
+
+  it('treats random transitions as a neutral crossfade fallback', () => {
+    expect(getTransitionViewportStyle({ transitionType: 'random', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      opacity: 0.25,
+      transform: 'none',
+      transition: 'none',
+    })
+    expect(getTransitionViewportStyle({ transitionType: 'random', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      opacity: 0.75,
+      transform: 'none',
+      transition: 'none',
+    })
+  })
+
   it('disables CSS interpolation even after transition ends', () => {
     expect(getTransitionViewportStyle({ width: 1280, height: 720 })).toMatchObject({
       transition: 'none',

@@ -94,6 +94,29 @@ describe('slide animation enhancer', () => {
     ])
   })
 
+  it('extracts paragraph build list entries from bldLst blocks', () => {
+    const slideXml = `
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+        <p:bldLst>
+          <p:bldP id="41" spid="7">
+            <p:txEl><p:pRg st="1" end="1"/></p:txEl>
+          </p:bldP>
+        </p:bldLst>
+      </p:sld>
+    `
+
+    expect(extractSlideAnimationMetadata(slideXml)).toEqual([
+      {
+        id: '41',
+        trigger: 'onClick',
+        durationMs: 350,
+        effect: 'fade',
+        targetElementId: '7',
+        targetParagraphIndex: 1,
+      },
+    ])
+  })
+
   it('applies extracted slide animations onto raw slide metadata when parser omits them', () => {
     const slide: RawPptxSlide = {
       elements: [{ id: '7', type: 'text' }],

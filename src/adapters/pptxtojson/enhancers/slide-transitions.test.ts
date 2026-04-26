@@ -3,7 +3,24 @@ import type { RawPptxSlide } from '../types'
 import { applySlideTransitionMetadata, extractSlideTransitionMetadata } from './slide-transitions'
 
 describe('slide transition enhancer', () => {
-  it('extracts transition type, speed and advance timing from slide xml', () => {
+  it('extracts transition type, custom duration and advance timing from slide xml', () => {
+    const metadata = extractSlideTransitionMetadata(`
+      <p:sld xmlns:p="p">
+        <p:transition spd="med" advTm="6500" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" p14:dur="1500">
+          <p:random />
+        </p:transition>
+      </p:sld>
+    `)
+
+    expect(metadata).toEqual({
+      type: 'random',
+      direction: undefined,
+      durationMs: 1500,
+      advanceAfterMs: 6500,
+    })
+  })
+
+  it('falls back to speed-based duration when custom duration is missing', () => {
     const metadata = extractSlideTransitionMetadata(`
       <p:sld xmlns:p="p">
         <p:transition spd="med" advTm="6500">

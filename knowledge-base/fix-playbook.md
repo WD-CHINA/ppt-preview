@@ -281,7 +281,30 @@
 - enhancer-level 真实 slide XML fixture
 - raw element 扩展字段统一类型化
 
-## 7. 表格渲染类
+### 7.2 slide XML 动画提取先区分 timing root 与 build list
+
+适用问题：
+
+- 真实 PPTX 在 WPS/PowerPoint 里看起来有“逐条淡入”或分步出现，但当前 parser 只读到 `p:timing` root
+- 不能只看 `p:timing` 有无对象级 children，就直接断言“没有对象动画”
+
+实践方案：
+
+- `slide-animations.ts` 先做最小 XML audit：
+  - 提取 `clickEffect / withEffect / afterEffect`
+  - 同时扫描 `p:bldLst` 里的最小 `bldP` paragraph build
+  - 统一把 `targetParagraphIndex` 传到 normalize 层
+- `evaluatePresentationFrame` 再把 paragraph build 可见性投影到 `EvaluatedElementFrame.renderedHtml`
+- `ElementRenderer.vue` 优先渲染 `renderedHtml`，让逐条出现真正落到画面
+- 先把“parser 没读出来”和“文件里确实没有”分开
+- 对明显需要 WPS / PowerPoint 对照的样本，先记录为 `open` 或 `partial`，不要直接写成“样本无动画”
+
+代码落点：
+
+- [src/adapters/pptxtojson/enhancers/slide-animations.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/slide-animations.ts)
+- [src/adapters/pptxtojson/enhancers/slide-animations.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/slide-animations.test.ts)
+- [src/adapters/pptxtojson/normalizePresentation.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/normalizePresentation.ts)
+
 
 ### 7.1 表格先标准化为 `NormalizedTableMeta`，Renderer 只消费稳定模型
 
@@ -464,15 +487,20 @@ pnpm build
 实践方案：
 
 - 新增 `enhancers/slide-transitions.ts`，直接从 slide XML 读取 `p:transition`：
-  - 子节点类型（如 `fade / push / wipe`）
+  - 子节点类型（如 `fade / push / wipe / random`）
   - `dir`
   - `spd`
   - `advTm`
+  - `p14:dur`（custom duration，优先级高于 `spd`）
 - 在 `textBodyInsets.ts` orchestration 里把 transition metadata 回填到 raw slide；再由 `normalizePresentation.ts` 把 `transition.advanceAfterMs/advTm` 归一化到 `slide.autoplay.advanceAfterMs`
-- 新增 `transitionViewportModel.ts`，先以纯函数方式对 `fade / push / wipe` 输出最小 viewport 中间态样式：
+- 新增 `transitionViewportModel.ts`，先以纯函数方式对 `fade / push / wipe / cover / uncover / split` 输出最小 viewport 中间态样式：
   - `fade`：延续当前 crossfade
   - `push`：previous/current 双 viewport 水平推进
+  - `cover`：current viewport 盖住 previous viewport，previous 继续停留在原位
+  - `uncover`：previous viewport 移开，current 维持静止
   - `wipe`：current viewport 用 `clip-path` 逐步揭示
+  - `split`：先保留为中性占位，等待专门 renderer
+- `random` 目前先以 `random` 作为语义标记保留，parser 侧已可识别 custom duration，renderer 侧把它收敛为中性 crossfade fallback（current/previous 仅做 opacity 互补，不额外加 fade 的 translate/scale）；但 `random` 本身仍是 open case（未知具体视觉效果）
 - 后续补 `push`/`wipe` 方向时，不要只在 helper 里硬编码；要把 `direction` 从 slide XML 一路带到 runtime frame：`slide-transitions.ts -> RawPptxSlide.transition.direction -> normalizePresentation -> evaluatePresentationFrame -> stageViewportModel -> SlideViewport`
 - `push` 当前已支持 `r/l/u/d` 四向 previous/current 位移；`wipe` 当前已支持 `r/l/u/d` 四向 clip-path 揭示，先锁纯函数测试，再做真实页视觉回归
 - 真实样本要区分两件事：`47e66b31f89d4b33b14c5010b92296c5.pptx` 已能验证 `push dir="u"`；`wipe` 则建议直接从现有小 deck 派生一个真实 fixture（如把 `演示文稿1.pptx` 的前四页 transition 改成 `wipe dir="r/l/u/d"`），再用浏览器逐页卡 mid-transition 检查 `frame.transitionDirection` 与 `.viewport` 的 `clipPath` 是否一致。这样可以把“纯函数四向测试”补成“真实 PPTX 四向回归”
@@ -580,8 +608,12 @@ pnpm build
   - `createMediaEngineState()`：建立 registry
   - `syncMediaEngine()`：按 active slide 维护 current/previous/next 缓存窗口，远页标记 released
   - `getMediaPlaybackPlan()`：根据 runtime state 输出 video/audio 的 play/pause/mute/rate/seek 计划
-- `createPresentationRuntime()` 持有 `runtime.media`，跳页和 transition tick 后同步 media engine
+- `createPresentationRuntime()` 持有 `runtime.media`，跳页和 transition tick 后同步 media engine；`dispose()` 在 runtime teardown 时统一 revoke object URL，避免旧模型切换后资源悬挂
 - `evaluatePresentationFrame()` 输出 slide-level `media` frames，给后续 `MediaRenderer` 或 DOM sync 层消费
+- transition active 时，`syncMediaEngine()` 需要同时保留 source / destination slide 的媒体 active 状态；否则 previous viewport 上的可见 video/audio 会冻结
+- `ElementRenderer.vue` 现在会把 `mediaPlayback` 同步到实际 `HTMLMediaElement`，让 video/audio 能跟随 runtime 的 play/pause/mute/seek 指令
+- `MediaRenderer.vue` 已把媒体类型分流成独立边界，后续可再抽成真正的 `MediaRenderer` / `MediaStage`
+- 如果媒体源加载失败，`ElementRenderer` / `MediaRenderer` 会优先使用 poster（video/audio）或回退 placeholder（image/math/video/audio 无 poster），避免整块空白
 
 代码落点：
 

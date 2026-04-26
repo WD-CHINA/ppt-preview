@@ -1,6 +1,7 @@
 import type { NormalizedPresentation, PresentationRuntimeState } from '../types/presentation'
 import {
   createMediaEngineState,
+  disposeMediaEngine,
   syncMediaEngine,
   type MediaEngineState,
 } from './media/mediaEngine'
@@ -37,6 +38,7 @@ export interface PresentationRuntime {
   setLoopEnabled: (value: boolean) => void
   setPlaybackRate: (value: number) => void
   tick: (deltaMs: number) => void
+  dispose: () => void
 }
 
 export function createPresentationRuntime(model: NormalizedPresentation): PresentationRuntime {
@@ -230,6 +232,10 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
     syncMediaEngine(media, state, model)
   }
 
+  function dispose() {
+    disposeMediaEngine(media)
+  }
+
   return {
     model,
     state,
@@ -249,5 +255,6 @@ export function createPresentationRuntime(model: NormalizedPresentation): Presen
     setLoopEnabled,
     setPlaybackRate,
     tick,
+    dispose,
   }
 }

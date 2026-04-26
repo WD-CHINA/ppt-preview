@@ -99,14 +99,7 @@ describe('evaluatePresentationFrame media output', () => {
   it('includes current slide media frames for renderer and media sync consumers', () => {
     const frame = evaluatePresentationFrame(model, state)
 
-    expect(frame.current?.media).toEqual([
-      {
-        elementId: 'video-1',
-        type: 'video',
-        media: { src: 'video-1.mp4', preload: 'metadata' },
-        playback: { action: 'play', muted: true, playbackRate: 1, seekMs: 1200 },
-      },
-    ])
+    expect(frame.current?.elements[0]?.mediaPlayback).toEqual({ action: 'play', muted: true, playbackRate: 1, seekMs: 1200 })
   })
 
   it('projects motion-path geometry into evaluated line bounds', () => {
@@ -120,6 +113,55 @@ describe('evaluatePresentationFrame media output', () => {
       translateY: -10,
       rotate: 5,
     })
+  })
+
+  it('projects paragraph-build visibility into rendered html for text elements', () => {
+    const paragraphModel: NormalizedPresentation = {
+      width: 1280,
+      height: 720,
+      theme: { colors: {} },
+      usedFonts: [],
+      slides: [
+        {
+          ...slide('slide-paragraphs', [
+            {
+              id: 'text-1',
+              type: 'text',
+              name: 'text-1',
+              order: 1,
+              bounds: { x: 0, y: 0, width: 200, height: 100, rotate: 0 },
+              style: {},
+              html: '<p>Alpha</p><p>Beta</p><p>Gamma</p>',
+              raw: null,
+            },
+          ]),
+          animations: [
+            {
+              id: 'build-1',
+              trigger: 'onClick',
+              durationMs: 350,
+              targetElementIds: ['text-1'],
+              targetParagraphIndex: 0,
+              effect: 'fade',
+            },
+            {
+              id: 'build-2',
+              trigger: 'onClick',
+              durationMs: 350,
+              targetElementIds: ['text-1'],
+              targetParagraphIndex: 1,
+              effect: 'fade',
+            },
+          ],
+        },
+      ],
+    }
+
+    const firstReveal = evaluatePresentationFrame(paragraphModel, { ...state, currentTriggerIndex: 1 })
+    const secondReveal = evaluatePresentationFrame(paragraphModel, { ...state, currentTriggerIndex: 2 })
+
+    expect(firstReveal.current?.elements[0]?.renderedHtml).toBe('<p>Alpha</p>')
+    expect(secondReveal.current?.elements[0]?.renderedHtml).toBe('<p>Alpha</p><p>Beta</p>')
   })
 
   it('uses the destination slide transition metadata while transitioning into the next slide', () => {

@@ -203,7 +203,9 @@ export interface EvaluatedElementFrame {
   style: Record<string, string>
   text?: string
   html?: string
+  renderedHtml?: string
   media?: MediaResource
+  mediaPlayback?: EvaluatedMediaFrame['playback']
   bounds: NormalizedElementBounds
   animationGeometry?: EvaluatedAnimationGeometry
   shape?: NormalizedShapeMeta

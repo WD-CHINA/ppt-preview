@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { NormalizedElement, NormalizedPresentation, NormalizedSlide, PresentationRuntimeState } from '../../types/presentation'
 import {
   collectMediaRegistry,
   createMediaEngineState,
+  disposeMediaEngine,
   getMediaPlaybackPlan,
   syncMediaEngine,
 } from './mediaEngine'
@@ -89,6 +90,22 @@ describe('media engine', () => {
     expect(engine.entries['image-4']?.status).toBe('released')
   })
 
+  it('keeps the source slide media active during a transition so visible media does not freeze', () => {
+    const engine = createMediaEngineState(model)
+
+    syncMediaEngine(
+      engine,
+      runtimeState({ activeSlideIndex: 1, transitionFromSlideIndex: 0, transitionToSlideIndex: 1, sessionStatus: 'transitioning' }),
+      model,
+    )
+
+    expect(engine.entries['image-1']?.status).toBe('active')
+    expect(engine.entries['video-1']?.status).toBe('active')
+    expect(engine.entries['audio-1']?.status).toBe('active')
+    expect(engine.entries['video-2']?.status).toBe('preloaded')
+    expect(engine.entries['image-4']?.status).toBe('released')
+  })
+
   it('builds a playback plan for active video and audio media from runtime state', () => {
     const engine = createMediaEngineState(model)
     const state = runtimeState({ activeSlideIndex: 1, sessionStatus: 'playing', timelinePositionMs: 2400, isMuted: true })
@@ -111,5 +128,36 @@ describe('media engine', () => {
       { elementId: 'video-1', action: 'pause', muted: false, playbackRate: 1, seekMs: 0 },
       { elementId: 'audio-1', action: 'pause', muted: false, playbackRate: 1, seekMs: 0 },
     ])
+  })
+
+  it('releases object URLs when the media engine is disposed', () => {
+    const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const engine = createMediaEngineState({
+      width: 1280,
+      height: 720,
+      theme: { colors: {} },
+      usedFonts: [],
+      slides: [
+        slide('slide-1', [
+          {
+            id: 'video-blob',
+            type: 'video',
+            name: 'video-blob',
+            order: 1,
+            bounds: { x: 0, y: 0, width: 100, height: 100, rotate: 0 },
+            style: {},
+            media: { objectUrl: 'blob:video-blob', cleanup: 'revoke-object-url' },
+            raw: null,
+          },
+        ]),
+      ],
+    })
+
+    disposeMediaEngine(engine)
+
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:video-blob')
+    expect(engine.entries['video-blob']?.status).toBe('released')
+
+    revokeObjectUrl.mockRestore()
   })
 })

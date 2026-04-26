@@ -20,12 +20,13 @@ export function extractSlideTransitionMetadata(slideXml: string): SlideTransitio
   const type = typeMatch?.[1]
   const direction = extractChildAttribute(innerXml, type, 'dir')
   const speed = extractAttribute(attributeSource, 'spd')
+  const customDurationMs = parseOptionalNumber(extractAttribute(attributeSource, 'p14:dur'))
   const advanceAfterMs = parseOptionalNumber(extractAttribute(attributeSource, 'advTm'))
 
   return {
     type,
     direction,
-    durationMs: mapTransitionSpeedToDuration(speed),
+    durationMs: customDurationMs ?? mapTransitionSpeedToDuration(speed),
     advanceAfterMs,
   }
 }

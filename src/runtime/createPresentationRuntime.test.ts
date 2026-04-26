@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { NormalizedElement, NormalizedPresentation, NormalizedSlide } from '../types/presentation'
 import { createPresentationRuntime } from './createPresentationRuntime'
 import { getMediaPlaybackPlan } from './media/mediaEngine'
@@ -123,5 +123,36 @@ describe('presentation runtime facade', () => {
 
     expect(runtime.media.entries['video-1']?.status).toBe('preloaded')
     expect(runtime.media.entries['video-2']?.status).toBe('active')
+  })
+
+  it('disposes media engine object URLs when the runtime is torn down', () => {
+    const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const runtime = createPresentationRuntime({
+      width: 1280,
+      height: 720,
+      theme: { colors: {} },
+      usedFonts: [],
+      slides: [
+        makeSlide('slide-1', undefined, [
+          {
+            id: 'video-1',
+            type: 'video',
+            name: 'video-1',
+            order: 1,
+            bounds: { x: 0, y: 0, width: 100, height: 100, rotate: 0 },
+            style: {},
+            media: { objectUrl: 'blob:video-1', cleanup: 'revoke-object-url' },
+            raw: null,
+          },
+        ]),
+      ],
+    })
+
+    runtime.dispose()
+
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:video-1')
+    expect(runtime.media.entries['video-1']?.status).toBe('released')
+
+    revokeObjectUrl.mockRestore()
   })
 })

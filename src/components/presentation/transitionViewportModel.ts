@@ -19,10 +19,34 @@ export function getTransitionViewportStyle(input: TransitionViewportInput) {
           opacity: 1,
           transform: getPushTransform({ ...input, axisRole: 'previous', progress }),
         }
+      case 'cover':
+        return {
+          transition,
+          opacity: 1,
+          transform: 'none',
+        }
+      case 'uncover':
+        return {
+          transition,
+          opacity: 1,
+          transform: getPushTransform({ ...input, axisRole: 'previous', progress }),
+        }
+      case 'split':
+        return {
+          transition,
+          opacity: 1,
+          transform: 'none',
+        }
       case 'wipe':
         return {
           transition,
           opacity: 1,
+          transform: 'none',
+        }
+      case 'random':
+        return {
+          transition,
+          opacity: 1 - progress,
           transform: 'none',
         }
       case 'fade':
@@ -43,12 +67,36 @@ export function getTransitionViewportStyle(input: TransitionViewportInput) {
           opacity: 1,
           transform: getPushTransform({ ...input, axisRole: 'current', progress }),
         }
+      case 'cover':
+        return {
+          transition,
+          opacity: 1,
+          transform: getPushTransform({ ...input, axisRole: 'current', progress }),
+        }
+      case 'uncover':
+        return {
+          transition,
+          opacity: 1,
+          transform: 'none',
+        }
+      case 'split':
+        return {
+          transition,
+          opacity: 1,
+          transform: 'none',
+        }
       case 'wipe':
         return {
           transition,
           opacity: 1,
           transform: 'none',
           clipPath: getWipeClipPath(input.transitionDirection, progress),
+        }
+      case 'random':
+        return {
+          transition,
+          opacity: progress,
+          transform: 'none',
         }
       case 'fade':
       default:

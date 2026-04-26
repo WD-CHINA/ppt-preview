@@ -11,6 +11,7 @@ import type {
   PresentationRuntimeState,
 } from '../types/presentation'
 import { evaluateAnimationGeometry, evaluateAnimationVisibility } from './timeline/timelineEngine'
+import { buildParagraphVisibilityHtml } from './timeline/paragraphBuild'
 
 export function evaluatePresentationFrame(
   model: NormalizedPresentation,
@@ -44,13 +45,30 @@ function evaluateSlideFrame(
     return undefined
   }
 
+  const mediaPlaybackByElementId = state ? createMediaPlaybackByElementId(slide, state) : new Map<string, NonNullable<EvaluatedMediaFrame['playback']>>()
+
   return {
     slideId: slide.id,
     slideName: slide.name,
     background: slide.background,
-    elements: slide.elements.map((element) => evaluateElementFrame(slide, element, state)),
+    elements: slide.elements.map((element) => evaluateElementFrame(slide, element, state, mediaPlaybackByElementId)),
     media: collectEvaluatedMediaFrames(slide.elements, state),
   }
+}
+
+function createMediaPlaybackByElementId(
+  slide: NormalizedSlide,
+  state: PresentationRuntimeState,
+) {
+  const playbackById = new Map<string, NonNullable<EvaluatedMediaFrame['playback']>>()
+
+  for (const frame of collectEvaluatedMediaFrames(slide.elements, state)) {
+    if (frame.playback) {
+      playbackById.set(frame.elementId, frame.playback)
+    }
+  }
+
+  return playbackById
 }
 
 function collectEvaluatedMediaFrames(
@@ -91,6 +109,7 @@ function evaluateElementFrame(
   slide: NormalizedSlide,
   element: NormalizedElement,
   state?: PresentationRuntimeState,
+  mediaPlaybackByElementId: Map<string, NonNullable<EvaluatedMediaFrame['playback']>> = new Map(),
 ): EvaluatedElementFrame {
   const animationState = state ? evaluateElementAnimationState(slide, element.id, state) : { visible: true, opacity: 1 }
   const animationGeometry = state ? evaluateElementAnimationGeometry(slide, element.id, state) : undefined
@@ -100,6 +119,8 @@ function evaluateElementFrame(
     y: element.bounds.y + (animationGeometry?.translateY ?? 0),
     rotate: element.bounds.rotate + (animationGeometry?.rotate ?? 0),
   }
+  const renderedHtml = state ? evaluateElementRenderedHtml(slide, element, state) : undefined
+  const mediaPlayback = mediaPlaybackByElementId.get(element.id)
 
   return {
     id: element.id,
@@ -112,6 +133,8 @@ function evaluateElementFrame(
     style: element.style,
     text: element.text,
     html: element.html,
+    renderedHtml,
+    mediaPlayback,
     media: element.media,
     bounds: evaluatedBounds,
     animationGeometry,
@@ -167,6 +190,52 @@ function evaluateElementAnimationGeometry(
     }),
     { progress: 0, translateX: 0, translateY: 0, rotate: 0 },
   )
+}
+
+function evaluateElementRenderedHtml(
+  slide: NormalizedSlide,
+  element: NormalizedElement,
+  state: PresentationRuntimeState,
+): string | undefined {
+  const sourceHtml = element.html ?? (typeof element.text === 'string' ? element.text : undefined)
+
+  if (!sourceHtml) {
+    return undefined
+  }
+
+  const buildCount = getVisibleParagraphBuildCount(slide, element.id, state.currentTriggerIndex)
+
+  if (buildCount == null) {
+    return undefined
+  }
+
+  return buildCount > 0 ? buildParagraphVisibilityHtml(sourceHtml, buildCount) : ''
+}
+
+function getVisibleParagraphBuildCount(
+  slide: NormalizedSlide,
+  elementId: string,
+  currentTriggerIndex: number,
+) {
+  const paragraphBuilds = slide.animations
+    .map((animation, index) => ({ animation, index }))
+    .filter(({ animation }) => animation.targetElementIds.includes(elementId) && typeof animation.targetParagraphIndex === 'number')
+
+  if (paragraphBuilds.length === 0) {
+    return null
+  }
+
+  let visibleParagraphCount = 0
+
+  for (const { animation, index } of paragraphBuilds) {
+    if (animation.trigger !== 'onClick' || index >= currentTriggerIndex) {
+      continue
+    }
+
+    visibleParagraphCount = Math.max(visibleParagraphCount, (animation.targetParagraphIndex ?? 0) + 1)
+  }
+
+  return visibleParagraphCount
 }
 
 function getTargetAnimations(slide: NormalizedSlide, elementId: string): NormalizedAnimation[] {

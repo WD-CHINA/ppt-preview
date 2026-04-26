@@ -64,11 +64,12 @@ export function syncMediaEngine(
   state: PresentationRuntimeState,
   model: NormalizedPresentation,
 ) {
-  const activeSlideIndex = getMediaActiveSlideIndex(state)
-  const retainedSlideIndexes = getRetainedSlideIndexes(model, activeSlideIndex)
+  const activeSlideIndexes = getMediaActiveSlideIndexes(state)
+  const primaryActiveSlideIndex = state.transitionToSlideIndex ?? state.activeSlideIndex
+  const retainedSlideIndexes = getRetainedSlideIndexes(model, primaryActiveSlideIndex)
 
   for (const entry of Object.values(engine.entries)) {
-    if (entry.slideIndex === activeSlideIndex) {
+    if (activeSlideIndexes.has(entry.slideIndex)) {
       entry.status = 'active'
       continue
     }
@@ -99,6 +100,29 @@ export function getMediaPlaybackPlan(
       playbackRate: state.playbackRate,
       seekMs: Math.max(0, state.timelinePositionMs),
     }))
+}
+
+export function disposeMediaEngine(engine: MediaEngineState) {
+  if (typeof URL === 'undefined') {
+    return
+  }
+
+  for (const entry of Object.values(engine.entries)) {
+    if (entry.media.cleanup === 'revoke-object-url' && entry.media.objectUrl) {
+      URL.revokeObjectURL(entry.media.objectUrl)
+    }
+    entry.status = 'released'
+  }
+}
+
+export function getMediaActiveSlideIndexes(state: PresentationRuntimeState) {
+  const activeSlideIndexes = new Set<number>([state.transitionToSlideIndex ?? state.activeSlideIndex])
+
+  if (state.transitionFromSlideIndex != null) {
+    activeSlideIndexes.add(state.transitionFromSlideIndex)
+  }
+
+  return activeSlideIndexes
 }
 
 export function getMediaActiveSlideIndex(state: PresentationRuntimeState) {

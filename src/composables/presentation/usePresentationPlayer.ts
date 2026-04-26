@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 import { parseWithPptxtojson } from '../../adapters/pptxtojson/parseWithPptxtojson'
-import { disposePresentationMedia, normalizePresentation } from '../../adapters/pptxtojson/normalizePresentation'
+import { normalizePresentation } from '../../adapters/pptxtojson/normalizePresentation'
 import { evaluatePresentationFrame } from '../../runtime/evaluatePresentationFrame'
 import { createPresentationRuntime } from '../../runtime/createPresentationRuntime'
 import type { NormalizedPresentation } from '../../types/presentation'
@@ -109,7 +109,7 @@ export function usePresentationPlayer() {
 
   watch(model, (nextModel, previousModel) => {
     if (previousModel && previousModel !== nextModel) {
-      disposePresentationMedia(previousModel)
+      runtime.value.dispose()
     }
 
     runtime.value = createPresentationRuntime(nextModel)
@@ -164,7 +164,7 @@ export function usePresentationPlayer() {
 
   onBeforeUnmount(() => {
     stopLoop()
-    disposePresentationMedia(model.value)
+    runtime.value.dispose()
   })
 
   return {

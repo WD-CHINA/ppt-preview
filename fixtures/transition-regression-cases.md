@@ -132,7 +132,18 @@ await harness.runTransitionRegressionSuite([
   - `frame.transitionDirection = "d"`
   - current：`clipPath = inset(0px 0px 35% 0px)` 或同趋势值
 
-## 当前缺口
+### 9. `random-default-open-case`
+- 文件：`4b00a85c247c47bdaeb01aeec562c90f.pptx`
+- 路径：多页 `slideN -> slideN+1`
+- 预期：
+  - `frame.transitionType = "random"`
+  - `frame.transitionProgress` 需要按 XML 里的 `p14:dur="1500"` 计算，而不是退回 `spd` 映射
+  - renderer 当前不尝试猜具体随机视觉效果，只把它收敛为中性 crossfade fallback
+- 已确认样本值：
+  - 所有页间 transition 都是 `<p:random/>`
+  - `p14:dur="1500"`
+- 备注：
+  - 这是一个“parser 已读到随机标记，但视觉语义未知”的 open case；适合作为后续随机转场语义研究的 baseline
 
 - 还没有把这些 case 接入自动截图比对
 - 还没有和 Office / WPS 中间态做像素级对照

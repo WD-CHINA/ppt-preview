@@ -8,11 +8,24 @@ const SUPPORTED_NODE_TYPES = new Map<string, RawPptxAnimation['trigger']>([
 
 export function extractSlideAnimationMetadata(slideXml: string): RawPptxAnimation[] {
   const timingXml = extractTagBlock(slideXml, 'p:timing')
+  const timingAnimations = timingXml ? extractTimingAnimationMetadata(timingXml) : []
+  const buildListAnimations = extractBuildListAnimationMetadata(slideXml)
 
-  if (!timingXml) {
-    return []
+  return dedupeRawAnimations([...timingAnimations, ...buildListAnimations])
+}
+
+export function applySlideAnimationMetadata(slide: RawPptxSlide, animations: RawPptxAnimation[]) {
+  if (!animations.length) {
+    return
   }
 
+  slide.animations = [
+    ...(Array.isArray(slide.animations) ? slide.animations : []),
+    ...animations,
+  ]
+}
+
+function extractTimingAnimationMetadata(timingXml: string) {
   return Array.from(SUPPORTED_NODE_TYPES.entries()).flatMap(([nodeType, trigger]) => {
     const effectRegex = new RegExp(`<p:cTn\\b([^>]*)nodeType="${nodeType}"([^>]*)>([\\s\\S]*?)<\\/p:cTn>`, 'g')
 
@@ -41,15 +54,65 @@ export function extractSlideAnimationMetadata(slideXml: string): RawPptxAnimatio
   })
 }
 
-export function applySlideAnimationMetadata(slide: RawPptxSlide, animations: RawPptxAnimation[]) {
-  if (!animations.length) {
-    return
+function extractBuildListAnimationMetadata(slideXml: string) {
+  const buildListXml = extractTagBlock(slideXml, 'p:bldLst')
+
+  if (!buildListXml) {
+    return []
   }
 
-  slide.animations = [
-    ...(Array.isArray(slide.animations) ? slide.animations : []),
-    ...animations,
-  ]
+  const buildRegex = /<p:bldP\b([^>]*)\/>|<p:bldP\b([^>]*)>([\s\S]*?)<\/p:bldP>/g
+
+  return Array.from(buildListXml.matchAll(buildRegex)).flatMap((match, index) => {
+    const openTag = `<p:bldP${match[1] ?? match[2] ?? ''}>`
+    const innerXml = match[3] ?? ''
+    const targetElementId =
+      extractAttribute(openTag, 'spid') ?? extractShapeTargetId(innerXml) ?? extractAttribute(openTag, 'spTgt')
+
+    if (!targetElementId) {
+      return []
+    }
+
+    const paragraphIndex = extractParagraphIndex(`${openTag}${innerXml}`)
+
+    return [
+      {
+        id: extractAttribute(openTag, 'id') ?? `build-${index + 1}`,
+        trigger: 'onClick',
+        durationMs: extractBehaviorDurationMs(innerXml),
+        effect: inferAnimationEffect(innerXml),
+        targetElementId,
+        ...(paragraphIndex != null ? { targetParagraphIndex: paragraphIndex } : {}),
+      } satisfies RawPptxAnimation,
+    ]
+  })
+}
+
+function dedupeRawAnimations(animations: RawPptxAnimation[]) {
+  const seen = new Set<string>()
+  const result: RawPptxAnimation[] = []
+
+  for (const animation of animations) {
+    const key = JSON.stringify({
+      id: animation.id ?? '',
+      trigger: animation.trigger ?? '',
+      durationMs: animation.durationMs ?? animation.duration ?? '',
+      effect: animation.effect ?? '',
+      targetElementId: animation.targetElementId ?? '',
+      targetElementIds: animation.targetElementIds ?? [],
+      targetParagraphIndex: animation.targetParagraphIndex ?? '',
+      motionPath: animation.motionPath ?? null,
+    })
+
+    if (seen.has(key)) {
+      continue
+    }
+
+    seen.add(key)
+    result.push(animation)
+  }
+
+  return result
 }
 
 function extractTagBlock(source: string, tagName: string) {

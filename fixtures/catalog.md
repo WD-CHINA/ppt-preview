@@ -12,7 +12,7 @@
 
 - 文件位置：[public/4b00a85c247c47bdaeb01aeec562c90f.pptx](/Applications/work/ppt-preview/public/4b00a85c247c47bdaeb01aeec562c90f.pptx)
 - 状态：`active`
-- 用途：当前最核心的高保真回归样本，覆盖文本、箭头、辅助框、单行/多行、shape 阴影与边框等问题
+- 用途：当前最核心的高保真回归样本，覆盖文本、箭头、辅助框、单行/多行、shape 阴影与边框等问题；同时也包含大量 `random` 页间转场，且 slide XML 上存在 `p14:dur="1500"` 这类自定义转场时长，需要 parser 真实读取而不是只看 `spd`
 
 重点页面：
 
@@ -286,3 +286,18 @@
 - `table-renderer`
 - `table-merge`
 - `table-typography`
+
+## 15. Slide animation synthetic regression fixtures
+
+- 文件位置：
+  - [src/adapters/pptxtojson/enhancers/slide-animations.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/slide-animations.test.ts)
+  - [src/adapters/pptxtojson/normalizePresentation.test.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/normalizePresentation.test.ts)
+- 状态：`covered-by-test`
+- 用途：锁住 slide XML 中 `p:timing` / `p:bldLst` 的最小动画提取与标准化传播，避免后续继续只靠真实样本猜测“到底是 timing root、paragraph build，还是 parser 漏读”；当前重点是把 `clickEffect / withEffect / afterEffect`、`targetParagraphIndex` 和最小 `bldP` paragraph build 先稳定下来
+
+标签：
+
+- `timing`
+- `animation`
+- `paragraph-build`
+- `object-animation`
