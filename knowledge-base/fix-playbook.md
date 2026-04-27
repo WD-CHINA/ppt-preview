@@ -492,14 +492,18 @@ pnpm build
   - `spd`
   - `advTm`
   - `p14:dur`（custom duration，优先级高于 `spd`）
+  - `pull` 这类 OOXML 原生标签要在 enhancer 层映射成 runtime 语义名；当前已补 `pull -> uncover`
+- `parseWithPptxtojson.ts` 不能只假设 `import('pptxtojson')` 一定能拿到 `parse`。在浏览器/Vite 下它通常能走 ESM 入口，但在 Node/Vitest 下可能先落到包的 `main`(UMD) 并得到空模块；当前已补“双入口兜底”：先尝试包入口，再 fallback 到 `pptxtojson/dist/index.js`
+- `textBodyInsets.ts` 不要因为 `DOMParser` 不存在就整段提前返回。`text inset / line markers` 确实依赖 DOMParser，但 `slide transition / slide animations / media MIME` 增强不应一起丢失；当前已改成只对需要 DOMParser 的增强做条件分支，让真实 PPTX regression test 能在 Node/Vitest 下继续跑通 transition/timing 链路
 - 在 `textBodyInsets.ts` orchestration 里把 transition metadata 回填到 raw slide；再由 `normalizePresentation.ts` 把 `transition.advanceAfterMs/advTm` 归一化到 `slide.autoplay.advanceAfterMs`
-- 新增 `transitionViewportModel.ts`，先以纯函数方式对 `fade / push / wipe / cover / uncover / split` 输出最小 viewport 中间态样式：
+- 新增 `transitionViewportModel.ts`，先以纯函数方式对 `fade / push / wipe / cover / uncover / split / zoom` 输出最小 viewport 中间态样式：
   - `fade`：延续当前 crossfade
   - `push`：previous/current 双 viewport 水平推进
   - `cover`：current viewport 盖住 previous viewport，previous 继续停留在原位
   - `uncover`：previous viewport 移开，current 维持静止
   - `wipe`：current viewport 用 `clip-path` 逐步揭示
   - `split`：先保留为中性占位，等待专门 renderer
+  - `zoom`：先做最小 scale + crossfade fallback，避免继续误掉回普通 `fade`
 - `random` 目前先以 `random` 作为语义标记保留，parser 侧已可识别 custom duration，renderer 侧把它收敛为中性 crossfade fallback（current/previous 仅做 opacity 互补，不额外加 fade 的 translate/scale）；但 `random` 本身仍是 open case（未知具体视觉效果）
 - 后续补 `push`/`wipe` 方向时，不要只在 helper 里硬编码；要把 `direction` 从 slide XML 一路带到 runtime frame：`slide-transitions.ts -> RawPptxSlide.transition.direction -> normalizePresentation -> evaluatePresentationFrame -> stageViewportModel -> SlideViewport`
 - `push` 当前已支持 `r/l/u/d` 四向 previous/current 位移；`wipe` 当前已支持 `r/l/u/d` 四向 clip-path 揭示，先锁纯函数测试，再做真实页视觉回归

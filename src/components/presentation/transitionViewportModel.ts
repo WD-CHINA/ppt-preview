@@ -37,6 +37,12 @@ export function getTransitionViewportStyle(input: TransitionViewportInput) {
           opacity: 1,
           transform: 'none',
         }
+      case 'zoom':
+        return {
+          transition,
+          opacity: 1 - progress,
+          transform: `scale(${1 + progress * 0.12})`,
+        }
       case 'wipe':
         return {
           transition,
@@ -84,6 +90,12 @@ export function getTransitionViewportStyle(input: TransitionViewportInput) {
           transition,
           opacity: 1,
           transform: 'none',
+        }
+      case 'zoom':
+        return {
+          transition,
+          opacity: progress,
+          transform: `scale(${0.88 + progress * 0.12})`,
         }
       case 'wipe':
         return {

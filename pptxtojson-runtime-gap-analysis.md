@@ -163,7 +163,7 @@ PPTX File
 
 ## 3. 部分完成但还不完整的部分
 
-### 3.1 Runtime 还没有拆成独立 engine
+### 3.1 Runtime engine 已拆出第一批，但 facade 仍偏厚
 
 架构文档目标是：
 
@@ -177,23 +177,25 @@ Presentation Runtime Facade
 └─ Input Engine
 ```
 
-当前这些能力仍然主要集中在 [createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts) 一个文件里。
+当前仓库已经拆出第一批 runtime engine / helper：
 
-已经有的只是：
+- [session/sessionStore.ts](/Applications/work/ppt-preview/src/runtime/session/sessionStore.ts)
+- [timeline/timelineEngine.ts](/Applications/work/ppt-preview/src/runtime/timeline/timelineEngine.ts)
+- [transition/transitionEngine.ts](/Applications/work/ppt-preview/src/runtime/transition/transitionEngine.ts)
+- [media/mediaEngine.ts](/Applications/work/ppt-preview/src/runtime/media/mediaEngine.ts)
+- [policy/playbackPolicy.ts](/Applications/work/ppt-preview/src/runtime/policy/playbackPolicy.ts)
+- [input/inputEngine.ts](/Applications/work/ppt-preview/src/runtime/input/inputEngine.ts)
 
-- facade
-- 一份集中式 runtime state
-- 基础 tick
-- 基础 slide/trigger/transition 处理
+[createPresentationRuntime.ts](/Applications/work/ppt-preview/src/runtime/createPresentationRuntime.ts) 现在更像 facade/orchestrator，而不是把所有逻辑都内联在一个文件里。
 
-还没有真正拆出：
+但当前仍不算“完全模块化 runtime”，因为 facade 里还保留了：
 
-- Session Store
-- Timeline Engine
-- Transition Engine
-- Media Engine
-- Playback Policy Engine
-- Input Engine
+- 导航入口与 sessionStatus 协调
+- slide state reset / media sync 的编排
+- RAF tick 到各 engine 的调度胶水
+- runtime 对 evaluator / renderer 的最终输出边界
+
+所以更准确的结论应是：**runtime 已完成第一轮拆分，但还没有拆到可独立演进、边界非常稳定的程度。**
 
 ### 3.2 Timeline 只有基础时序
 
@@ -234,7 +236,7 @@ Presentation Runtime Facade
 
 - transition 元数据
 - 通过 slide XML enhancer 回填 `advTm -> slide.autoplay.advanceAfterMs`
-- `transitionViewportModel.ts` 中针对 `fade / push / wipe` 的最小 typed viewport 中间态
+- `transitionViewportModel.ts` 中针对 `fade / push / wipe / cover / uncover / split / zoom / random` 的 typed viewport 分发
 - `push` 已开始支持 `direction`，当前已用真实 `47e66b31f89d4b33b14c5010b92296c5.pptx` 复验 `dir="u"` 的垂直推进（XML 实际命中 `slide2/6/7` 的 `<p:push dir="u"/>`）
 - `wipe` 已支持 `direction`，当前最小 renderer 会按 `dir="r/l/u/d"` 派发四向 clip-path 揭示；仓库内已新增 `wipe-directions-fixture.pptx` 作为真实 `wipe dir` browser regression 样本
 - 已开始把真实转场回归流程系统化：新增 `fixtures/transition-regression-cases.md`、`fixtures/transition-regression-baseline.json` 与 `public/transition-regression-harness.js`，覆盖 `fade / push / wipe` 的固定 progress 中间态证据收集
@@ -246,7 +248,7 @@ Presentation Runtime Facade
 
 仍未系统支持：
 
-- cover / uncover / split / zoom 的真实页视觉回归与完整 renderer 语义（当前 `transitionViewportModel` 只给了最小占位/近似行为，`zoom` 仍未实现）
+- cover / uncover / split / zoom 的真实页视觉回归与更完整 renderer 语义（当前 `cover / uncover / zoom` 仍只是最小近似行为，`split` 仍是中性占位）
 - wipe 的更系统视觉回归（方向虽已支持，但还没做真实页中间态对照）
 - random 转场的专门 renderer 语义（parser 已能读到 `p14:dur`，renderer 侧仅作中性 crossfade fallback）
 - 更高保真的 easing / mask / clip 几何
@@ -263,15 +265,13 @@ Presentation Runtime Facade
 - runtime / media engine teardown 时的 object URL revoke
 - `MediaRenderer.vue` 抽离出的媒体渲染边界
 
-但还没有形成架构文档要求的完整 Media Engine（目前已具备 registry / cache window / playback plan / transition-aware media retention 的最小切片，且已开始把 `play/pause/mute/seek` 同步到 DOM 媒体元素；后续还要补媒体加载失败 fallback、poster/首帧与懒加载）。
+但还没有形成架构文档要求的完整 Media Engine（目前已具备 registry / cache window / playback plan / transition-aware media retention 的最小切片，且已经把 `play/pause/mute/seek` 同步到 DOM 媒体元素，并补了媒体加载失败 fallback；后续还要补更完整的 poster/首帧与懒加载策略）。
 
 仍然缺少：
 
-- 加载失败 fallback 的系统化处理
-- poster / 首帧策略
+- poster / 首帧策略的系统化处理
 - 大媒体懒加载
 - 更细的 object URL / 缓存释放策略（当前只有 teardown 级 revoke）
-- `MediaRenderer` 独立化
 - 更完整的 preload current / next policy
 - 更完整的 slide-aware media eviction policy
 

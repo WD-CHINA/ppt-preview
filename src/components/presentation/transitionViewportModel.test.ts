@@ -93,6 +93,19 @@ describe('transitionViewportModel', () => {
     })
   })
 
+  it('renders zoom transitions as a scale-based crossfade fallback', () => {
+    expect(getTransitionViewportStyle({ transitionType: 'zoom', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      opacity: 0.25,
+      transform: 'scale(0.91)',
+      transition: 'none',
+    })
+    expect(getTransitionViewportStyle({ transitionType: 'zoom', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      opacity: 0.75,
+      transform: 'scale(1.03)',
+      transition: 'none',
+    })
+  })
+
   it('treats random transitions as a neutral crossfade fallback', () => {
     expect(getTransitionViewportStyle({ transitionType: 'random', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
       opacity: 0.25,

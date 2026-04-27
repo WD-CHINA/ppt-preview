@@ -307,14 +307,17 @@
 
 - 状态：`partial`
 - 典型现象：
-  - 真实 PPT 里可见 `cover / uncover / split` 一类转场，但 renderer 还没有对应的完整几何语义
+  - 真实 PPT 里可见 `cover / uncover / split / zoom` 一类转场，但 renderer 还没有对应的完整几何语义
   - 如果没有分支处理，所有未知转场会继续掉到同一套 `fade`/opacity 行为
 - 当前进展：
-  - `transitionViewportModel.ts` 已把 `cover / uncover / split` 接入 typed dispatch
-  - 其中 `cover` / `uncover` 用最小方向性移动占位，`split` 先保留为中性占位
+  - `transitionViewportModel.ts` 已把 `cover / uncover / split / zoom` 接入 typed dispatch
+  - 其中 `cover` / `uncover` 用最小方向性移动占位
+  - `zoom` 已补最小 scale + crossfade fallback，至少不再掉回普通 `fade`
+  - `split` 仍先保留为中性占位
+  - 已新增真实样本 `transition-cover-uncover-zoom-split-fixture.pptx`，并用 `src/components/presentation/transitionFixtureRegression.test.ts` 锁住 `pptx -> parse -> normalize -> runtime -> viewport style` 链路
 - 仍未覆盖：
   - 真实页 WPS / PowerPoint 中间态对照
-  - `zoom` 的 renderer 语义
+  - `split` 的 renderer 语义
   - 更完整的 mask / 方向 / easing 细节
 - 关键做法：
   - 先把未知转场从 `fade` 里分出来，避免语义污染

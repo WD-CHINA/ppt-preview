@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "updated_from": "browser_console harness runs after WPS-aligned destination-slide transition fix",
+  "version": 3,
+  "updated_from": "browser_console harness runs plus node/vitest fixture regression for cover/uncover/zoom/split",
   "cases": [
     {
       "caseId": "push-default-real",
@@ -218,6 +218,117 @@
         {
           "role": "current",
           "clipPath": "inset(0px 0px 35% 0px)",
+          "opacity": "1",
+          "transform": "none"
+        }
+      ]
+    },
+    {
+      "caseId": "cover-right-real",
+      "fileName": "transition-cover-uncover-zoom-split-fixture.pptx",
+      "sourceSlideIndex": 0,
+      "prepareMode": "mutateState",
+      "tickMs": 400,
+      "frame": {
+        "currentSlideIndex": 1,
+        "isTransitioning": true,
+        "transitionType": "cover",
+        "transitionDirection": "r",
+        "transitionProgress": 0.5
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "none"
+        },
+        {
+          "role": "current",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "translateX(640px)"
+        }
+      ]
+    },
+    {
+      "caseId": "uncover-left-real",
+      "fileName": "transition-cover-uncover-zoom-split-fixture.pptx",
+      "sourceSlideIndex": 1,
+      "prepareMode": "mutateState",
+      "tickMs": 250,
+      "frame": {
+        "currentSlideIndex": 2,
+        "isTransitioning": true,
+        "transitionType": "uncover",
+        "transitionDirection": "l",
+        "transitionProgress": 0.5
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "translateX(640px)"
+        },
+        {
+          "role": "current",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "none"
+        }
+      ]
+    },
+    {
+      "caseId": "zoom-default-real",
+      "fileName": "transition-cover-uncover-zoom-split-fixture.pptx",
+      "sourceSlideIndex": 2,
+      "prepareMode": "mutateState",
+      "tickMs": 600,
+      "frame": {
+        "currentSlideIndex": 3,
+        "isTransitioning": true,
+        "transitionType": "zoom",
+        "transitionProgress": 0.5
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "0.5",
+          "transform": "scale(1.06)"
+        },
+        {
+          "role": "current",
+          "clipPath": "none",
+          "opacity": "0.5",
+          "transform": "scale(0.94)"
+        }
+      ]
+    },
+    {
+      "caseId": "split-vert-out-real",
+      "fileName": "transition-cover-uncover-zoom-split-fixture.pptx",
+      "sourceSlideIndex": 3,
+      "prepareMode": "mutateState",
+      "tickMs": 400,
+      "frame": {
+        "currentSlideIndex": 4,
+        "isTransitioning": true,
+        "transitionType": "split",
+        "transitionDirection": "out",
+        "transitionProgress": 0.5
+      },
+      "viewports": [
+        {
+          "role": "previous",
+          "clipPath": "none",
+          "opacity": "1",
+          "transform": "none"
+        },
+        {
+          "role": "current",
+          "clipPath": "none",
           "opacity": "1",
           "transform": "none"
         }

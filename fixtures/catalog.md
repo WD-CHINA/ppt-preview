@@ -191,6 +191,34 @@
 - `transition`
 - `timing`
 
+## 12. `transition-cover-uncover-zoom-split-fixture.pptx`
+
+- 文件位置：[public/transition-cover-uncover-zoom-split-fixture.pptx](/Applications/work/ppt-preview/public/transition-cover-uncover-zoom-split-fixture.pptx)
+- 状态：`active`
+- 用途：真实 `cover / pull(uncover) / zoom / split` 转场浏览器回归样本；由 `wipe-directions-fixture.pptx` 派生，专门用于补齐非 `fade/push/wipe` typed dispatch 的真实解析输入
+- 已确认页面：
+  - `slide2.xml`：`<p:cover dir="r"/>`
+  - `slide3.xml`：`<p:pull dir="l"/>`，runtime 语义应映射为 `uncover`
+  - `slide4.xml`：`<p:zoom/>`
+  - `slide5.xml`：`<p:split orient="vert" dir="out"/>`
+- 当前价值：
+  - parser 已可复验 `pull -> uncover` 语义映射
+  - 已有真实 PPTX regression test：`src/components/presentation/transitionFixtureRegression.test.ts`
+  - 后续可直接接入 `transition-regression-harness.js`，固化 `frame.transitionType / transitionDirection / viewport transform / opacity`
+  - 为 `zoom / cover / uncover / split` 从“纯函数 fallback”推进到“真实 PPTX 回归”提供固定输入
+- 边界：
+  - 目前还没有把这份 fixture 的中间态写入结构化 baseline
+  - `split` renderer 仍是中性占位，真实几何语义还没实现
+
+标签：
+
+- `transition`
+- `timing`
+- `cover`
+- `uncover`
+- `zoom`
+- `split`
+
 ## 9. `math_probability_statistics_formulas.pptx`
 
 - 文件位置：[public/math_probability_statistics_formulas.pptx](/Applications/work/ppt-preview/public/math_probability_statistics_formulas.pptx)

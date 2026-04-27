@@ -26,6 +26,10 @@ await harness.runTransitionRegressionSuite([
   { caseId: 'wipe-left-real', fileName: 'wipe-directions-fixture.pptx', sourceSlideIndex: 1, prepareMode: 'mutateState', tickMs: 400 },
   { caseId: 'wipe-up-real', fileName: 'wipe-directions-fixture.pptx', sourceSlideIndex: 2, prepareMode: 'mutateState', tickMs: 400 },
   { caseId: 'wipe-down-real', fileName: 'wipe-directions-fixture.pptx', sourceSlideIndex: 3, prepareMode: 'mutateState', tickMs: 400 },
+  { caseId: 'cover-right-real', fileName: 'transition-cover-uncover-zoom-split-fixture.pptx', sourceSlideIndex: 0, prepareMode: 'mutateState', tickMs: 400 },
+  { caseId: 'uncover-left-real', fileName: 'transition-cover-uncover-zoom-split-fixture.pptx', sourceSlideIndex: 1, prepareMode: 'mutateState', tickMs: 250 },
+  { caseId: 'zoom-default-real', fileName: 'transition-cover-uncover-zoom-split-fixture.pptx', sourceSlideIndex: 2, prepareMode: 'mutateState', tickMs: 600 },
+  { caseId: 'split-vert-out-real', fileName: 'transition-cover-uncover-zoom-split-fixture.pptx', sourceSlideIndex: 3, prepareMode: 'mutateState', tickMs: 400 },
 ])
 ```
 
@@ -145,6 +149,58 @@ await harness.runTransitionRegressionSuite([
 - 备注：
   - 这是一个“parser 已读到随机标记，但视觉语义未知”的 open case；适合作为后续随机转场语义研究的 baseline
 
+### 10. `cover-right-real`
+- 文件：`transition-cover-uncover-zoom-split-fixture.pptx`
+- 路径：`slide1 -> slide2`
+- 预期：
+  - `frame.transitionType = "cover"`
+  - `frame.transitionDirection = "r"`
+  - previous/current 共 2 个 viewport
+  - previous 保持原位，current 自右向左覆盖进入
+- 已记录样本值：
+  - `transitionProgress = 0.5`
+  - previous：`transform = none`
+  - current：`transform = translateX(640px)`
+
+### 11. `uncover-left-real`
+- 文件：`transition-cover-uncover-zoom-split-fixture.pptx`
+- 路径：`slide2 -> slide3`
+- 预期：
+  - `frame.transitionType = "uncover"`
+  - `frame.transitionDirection = "l"`
+  - previous/current 共 2 个 viewport
+  - current 保持原位，previous 向右退出
+- 已记录样本值：
+  - `transitionProgress = 0.5`
+  - previous：`transform = translateX(640px)`
+  - current：`transform = none`
+- 备注：
+  - slide XML 实际标签是 `<p:pull dir="l"/>`；parser/runtime 侧应映射成 `uncover`
+
+### 12. `zoom-default-real`
+- 文件：`transition-cover-uncover-zoom-split-fixture.pptx`
+- 路径：`slide3 -> slide4`
+- 预期：
+  - `frame.transitionType = "zoom"`
+  - previous/current 共 2 个 viewport
+  - 当前实现先用 scale + crossfade fallback，后续再和 Office/WPS 对照细化
+- 已记录样本值：
+  - `transitionProgress = 0.5`
+  - previous：`opacity = 0.5`，`transform = scale(1.06)`
+  - current：`opacity = 0.5`，`transform = scale(0.94)`
+
+### 13. `split-vert-out-real`
+- 文件：`transition-cover-uncover-zoom-split-fixture.pptx`
+- 路径：`slide4 -> slide5`
+- 预期：
+  - `frame.transitionType = "split"`
+  - `frame.transitionDirection = "out"`
+  - 当前 renderer 仍为中性占位，但 parser 应能稳定读到 type/direction
+- 已记录样本值：
+  - `transitionProgress = 0.5`
+  - previous/current：`transform = none`
+- 备注：
+  - slide XML 还带 `orient="vert"`，当前 runtime 尚未消费这一路元数据
+
 - 还没有把这些 case 接入自动截图比对
 - 还没有和 Office / WPS 中间态做像素级对照
-- `cover / uncover / split / zoom` 还没有对应真实视觉回归样本

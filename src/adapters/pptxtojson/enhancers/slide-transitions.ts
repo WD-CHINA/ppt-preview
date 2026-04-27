@@ -16,9 +16,9 @@ export function extractSlideTransitionMetadata(slideXml: string): SlideTransitio
 
   const attributeSource = transitionMatch[1] ?? transitionMatch[3] ?? ''
   const innerXml = transitionMatch[2] ?? ''
-  const typeMatch = innerXml.match(/<p:([a-zA-Z0-9]+)\b/)
-  const type = typeMatch?.[1]
-  const direction = extractChildAttribute(innerXml, type, 'dir')
+  const rawType = innerXml.match(/<p:([a-zA-Z0-9]+)\b/)?.[1]
+  const type = normalizeTransitionType(rawType)
+  const direction = extractChildAttribute(innerXml, rawType, 'dir')
   const speed = extractAttribute(attributeSource, 'spd')
   const customDurationMs = parseOptionalNumber(extractAttribute(attributeSource, 'p14:dur'))
   const advanceAfterMs = parseOptionalNumber(extractAttribute(attributeSource, 'advTm'))
@@ -77,6 +77,15 @@ function extractChildAttribute(source: string, childTag: string | undefined, att
 
   const match = source.match(new RegExp(`<p:${childTag}\\b[^>]*${attributeName}="([^"]+)"`))
   return match?.[1] ?? undefined
+}
+
+function normalizeTransitionType(type: string | undefined) {
+  switch (type) {
+    case 'pull':
+      return 'uncover'
+    default:
+      return type
+  }
 }
 
 function parseOptionalNumber(value: string | null) {

@@ -289,7 +289,6 @@ onBeforeUnmount(() => {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(18rem, 0.9fr);
   gap: 1rem;
   min-height: 0;
 }

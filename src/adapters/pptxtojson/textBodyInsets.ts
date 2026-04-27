@@ -10,10 +10,11 @@ export async function enrichTextBodyInsets(
   raw: RawPptxDocument,
   input: ArrayBuffer,
 ): Promise<RawPptxDocument> {
-  if (!Array.isArray(raw.slides) || typeof DOMParser === 'undefined') {
+  if (!Array.isArray(raw.slides)) {
     return raw
   }
 
+  const canParseXmlDom = typeof DOMParser !== 'undefined'
   const zip = await JSZip.loadAsync(input)
   await correctEmbeddedMediaMimeTypes(raw, zip)
 
@@ -25,8 +26,6 @@ export async function enrichTextBodyInsets(
         return
       }
 
-      const textBodyInsets = extractSlideTextBodyInsets(slideXml)
-      const lineMarkers = extractSlideLineMarkers(slideXml)
       const slideTransition = extractSlideTransitionMetadata(slideXml)
       const slideAnimations = extractSlideAnimationMetadata(slideXml)
       const slideElements = [
@@ -34,8 +33,13 @@ export async function enrichTextBodyInsets(
         ...(Array.isArray(slide.elements) ? slide.elements : []),
       ]
 
-      applyTextBodyInsets(slideElements, textBodyInsets)
-      applyLineMarkers(slideElements, lineMarkers)
+      if (canParseXmlDom) {
+        const textBodyInsets = extractSlideTextBodyInsets(slideXml)
+        const lineMarkers = extractSlideLineMarkers(slideXml)
+        applyTextBodyInsets(slideElements, textBodyInsets)
+        applyLineMarkers(slideElements, lineMarkers)
+      }
+
       applySlideTransitionMetadata(slide, slideTransition)
       applySlideAnimationMetadata(slide, slideAnimations)
     }),

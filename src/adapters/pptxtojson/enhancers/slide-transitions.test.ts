@@ -37,6 +37,23 @@ describe('slide transition enhancer', () => {
     })
   })
 
+  it('maps PresentationML pull transitions onto the runtime uncover semantic', () => {
+    const metadata = extractSlideTransitionMetadata(`
+      <p:sld xmlns:p="p">
+        <p:transition spd="fast" advTm="4500">
+          <p:pull dir="l" />
+        </p:transition>
+      </p:sld>
+    `)
+
+    expect(metadata).toEqual({
+      type: 'uncover',
+      direction: 'l',
+      durationMs: 500,
+      advanceAfterMs: 4500,
+    })
+  })
+
   it('applies extracted transition timing onto raw slide metadata when parser omits autoplay timing', () => {
     const slide: RawPptxSlide = {
       transition: { type: 'fade', durationMs: 400 },
