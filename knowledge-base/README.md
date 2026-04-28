@@ -10,6 +10,12 @@
 - [question-cases.md](/Applications/work/ppt-preview/knowledge-base/question-cases.md)
 - [fix-playbook.md](/Applications/work/ppt-preview/knowledge-base/fix-playbook.md)
 
+解析相关问题补充约定：
+
+- `src/vendor/pptxtojson/`：上游 parser 源码与底层 OOXML 解析
+- `src/adapters/pptxtojson/`：项目专属增强、适配、normalize
+- 记录修复方案时，要尽量说明问题属于 vendor parser、adapter enhancer、normalize，还是 renderer/runtime
+
 建议维护方式：
 
 1. 用户反馈进入 `question-cases.md`

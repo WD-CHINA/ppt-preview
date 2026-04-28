@@ -45,25 +45,33 @@
 
 ---
 
-## 3. pptxtojson 的安装与使用方式
+## 3. pptxtojson 的接入与使用方式
 
-### 安装
+### 当前项目接入方式
 
-```bash
-npm install pptxtojson
-```
+当前 `ppt-preview` 不再直接依赖 npm 包入口，而是将上游 `pptxtojson` 源码 vendoring 到本仓库：
 
-### 浏览器端典型用法
+- 上游源码落点：`src/vendor/pptxtojson/`
+- 项目适配入口：`src/adapters/pptxtojson/parseWithPptxtojson.ts`
+- 标准化入口：`src/adapters/pptxtojson/normalizePresentation.ts`
+
+### 当前项目中的典型用法
 
 ```ts
-import { parse } from 'pptxtojson'
+import { parseWithPptxtojson } from './src/adapters/pptxtojson/parseWithPptxtojson'
 
-const json = await parse(arrayBuffer, {
+const json = await parseWithPptxtojson(arrayBuffer, {
   imageMode: 'both',
   videoMode: 'blob',
   audioMode: 'blob',
 })
 ```
+
+### 如果需要同步上游
+
+- 上游仓库：`https://github.com/pipipi-pikachu/pptxtojson`
+- 优先同步到 `src/vendor/pptxtojson/`
+- 不要再把运行时直接绑到 `import('pptxtojson')` 或 `pptxtojson/dist/index.js`
 
 ### 推荐资源模式
 
@@ -191,7 +199,8 @@ ppt-preview Runtime / Renderer / Presentation UI
 
 也就是说：
 
-- `pptxtojson` 替代或补强当前项目的解析输入层
+- `src/vendor/pptxtojson/` 负责承接上游 parser 源码与底层 OOXML 解析
+- `src/adapters/pptxtojson/` 负责项目专属增强、适配与标准化建模
 - `ppt-preview` 继续演进播放 Runtime 与渲染层
 
 ---
@@ -202,10 +211,13 @@ ppt-preview Runtime / Renderer / Presentation UI
 PPTX File
    │
    ▼
-pptxtojson Parser
+src/vendor/pptxtojson/ (upstream parser)
    │
    ▼
 Raw Parsed JSON
+   │
+   ▼
+src/adapters/pptxtojson/ (enhancers + normalize)
    │
    ▼
 Normalized Presentation Model
@@ -492,7 +504,7 @@ components/presentation/
 PPTX File
    │
    ▼
-pptxtojson.parse()
+parseWithPptxtojson(arrayBuffer)
    │
    ▼
 Raw Parsed JSON
@@ -561,10 +573,15 @@ Vue components render current frame
 
 ```text
 src/
+├─ vendor/
+│  └─ pptxtojson/
+│     └─ *.js
+│
 ├─ adapters/
 │  └─ pptxtojson/
 │     ├─ parseWithPptxtojson.ts
 │     ├─ normalizePresentation.ts
+│     ├─ enhancers/
 │     └─ types.ts
 │
 ├─ runtime/
@@ -604,9 +621,9 @@ src/
 ## 16. 接入策略建议
 
 ### 阶段 1：替换解析输入层
-- 引入 `pptxtojson`
-- 新增 `parseWithPptxtojson.ts`
-- 新增 `normalizePresentation.ts`
+- 将上游 `pptxtojson` 源码 vendoring 到 `src/vendor/pptxtojson/`
+- 新增/维护 `parseWithPptxtojson.ts` 作为项目适配入口
+- 新增/维护 `normalizePresentation.ts` 作为标准化入口
 - 暂时保持现有渲染器与播放器逻辑可继续运行
 
 ### 阶段 2：重构 Runtime

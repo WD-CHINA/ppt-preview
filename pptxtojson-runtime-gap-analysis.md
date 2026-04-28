@@ -19,16 +19,17 @@
 
 ```text
 PPTX File
-  -> pptxtojson.parse()
+  -> src/vendor/pptxtojson/
+  -> parseWithPptxtojson()
   -> normalizePresentation()
-  -> createPresentationRuntime()
-  -> evaluatePresentationFrame()
+  -> runtime / evaluator / renderer
+
   -> Vue Render Components
 ```
 
 也就是说：
 
-- 解析输入层已经切到 `pptxtojson`
+- 解析输入层已经切到 `src/vendor/pptxtojson/` + `src/adapters/pptxtojson/` 双层结构
 - 已经有标准化模型层
 - 已经有基础 Runtime facade
 - 已经有 Evaluator

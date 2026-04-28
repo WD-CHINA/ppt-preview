@@ -5,12 +5,12 @@
 目标：
 
 - 固定高频回归样本
-- 给 XML enhancer / normalize / renderer 提供稳定输入
+- 给 vendor parser / adapter enhancers / normalize / renderer 提供稳定输入
 - 为后续截图回归和 fixture 测试提供索引
 
 当前样本目录中的源文件仍然放在 [public/](/Applications/work/ppt-preview/public)，这里先维护“索引和标签”，不复制二进制文件。
 
-补充约定：Runtime / Policy / Engine 拆分类问题可以使用不依赖 PPTX 的合成 fixture，记录在 [runtime-regression-cases.md](./runtime-regression-cases.md)。真实 PPTX fixture 用于视觉/解析还原，合成 fixture 用于锁住状态机行为边界。
+补充约定：Runtime / Policy / Engine 拆分类问题可以使用不依赖 PPTX 的合成 fixture，记录在 [runtime-regression-cases.md](./runtime-regression-cases.md)。真实 PPTX fixture 用于校验 `src/vendor/pptxtojson/` + `src/adapters/pptxtojson/` 的解析/标准化输出，以及最终视觉还原；合成 fixture 用于锁住状态机行为边界。
 
 表格类问题同时维护 [table-regression-cases.md](./table-regression-cases.md)：用合成测试锁住 `NormalizedTableMeta` 与 renderer helper 行为，用真实 PPTX 页面索引推进视觉回归。
 

@@ -93,12 +93,13 @@ src/
 
 ```text
 PPTX File
-  -> pptxtojson.parse()
-  -> XML enhancement
+  -> src/vendor/pptxtojson/
+  -> parseWithPptxtojson()
+  -> adapter enhancers
   -> normalizePresentation()
-  -> createPresentationRuntime()
-  -> evaluatePresentationFrame()
-  -> Vue components
+  -> runtime frame evaluation
+  -> Vue renderer
+
 ```
 
 ## 还原细节
