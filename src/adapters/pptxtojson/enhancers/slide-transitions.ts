@@ -3,6 +3,7 @@ import type { RawPptxSlide } from '../types'
 export interface SlideTransitionMetadata {
   type?: string
   direction?: string
+  orientation?: string
   durationMs?: number
   advanceAfterMs?: number
 }
@@ -19,6 +20,7 @@ export function extractSlideTransitionMetadata(slideXml: string): SlideTransitio
   const rawType = innerXml.match(/<p:([a-zA-Z0-9]+)\b/)?.[1]
   const type = normalizeTransitionType(rawType)
   const direction = extractChildAttribute(innerXml, rawType, 'dir')
+  const orientation = extractChildAttribute(innerXml, rawType, 'orient')
   const speed = extractAttribute(attributeSource, 'spd')
   const customDurationMs = parseOptionalNumber(extractAttribute(attributeSource, 'p14:dur'))
   const advanceAfterMs = parseOptionalNumber(extractAttribute(attributeSource, 'advTm'))
@@ -26,6 +28,7 @@ export function extractSlideTransitionMetadata(slideXml: string): SlideTransitio
   return {
     type,
     direction,
+    orientation,
     durationMs: customDurationMs ?? mapTransitionSpeedToDuration(speed),
     advanceAfterMs,
   }
@@ -40,6 +43,7 @@ export function applySlideTransitionMetadata(slide: RawPptxSlide, metadata: Slid
     ...(slide.transition ?? {}),
     ...(metadata.type ? { type: metadata.type } : {}),
     ...(metadata.direction ? { direction: metadata.direction } : {}),
+    ...(metadata.orientation ? { orientation: metadata.orientation } : {}),
     ...(metadata.durationMs != null ? { durationMs: metadata.durationMs } : {}),
     ...(metadata.advanceAfterMs != null ? { advanceAfterMs: metadata.advanceAfterMs } : {}),
   }

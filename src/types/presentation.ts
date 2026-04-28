@@ -26,6 +26,7 @@ export interface SlideBackground {
 export interface SlideTransitionMeta {
   type: string
   direction?: string
+  orientation?: string
   durationMs: number
 }
 

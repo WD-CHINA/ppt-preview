@@ -1,6 +1,7 @@
 export interface TransitionViewportInput {
   transitionType?: string
   transitionDirection?: string
+  transitionOrientation?: string
   role?: 'current' | 'previous'
   progress?: number
   width: number
@@ -35,7 +36,7 @@ export function getTransitionViewportStyle(input: TransitionViewportInput) {
         return {
           transition,
           opacity: 1,
-          transform: 'none',
+          transform: getSplitTransform({ ...input, axisRole: 'previous', progress }),
         }
       case 'zoom':
         return {
@@ -89,7 +90,7 @@ export function getTransitionViewportStyle(input: TransitionViewportInput) {
         return {
           transition,
           opacity: 1,
-          transform: 'none',
+          transform: getSplitTransform({ ...input, axisRole: 'current', progress }),
         }
       case 'zoom':
         return {
@@ -164,4 +165,24 @@ function getWipeClipPath(direction: string | undefined, progress: number) {
     default:
       return `inset(0 ${hiddenPercent}% 0 0)`
   }
+}
+
+function getSplitTransform(
+  input: TransitionViewportInput & { axisRole: 'current' | 'previous'; progress: number },
+) {
+  const orientation = input.transitionOrientation ?? 'vert'
+  const direction = input.transitionDirection ?? 'out'
+  const currentScale = direction === 'in' ? input.progress : 1 - input.progress
+  const previousScale = direction === 'in' ? 1 - input.progress : input.progress
+  const scale = input.axisRole === 'current' ? currentScale : previousScale
+
+  if (orientation === 'horz') {
+    return `scaleX(${roundTransitionScalar(scale)})`
+  }
+
+  return `scaleY(${roundTransitionScalar(scale)})`
+}
+
+function roundTransitionScalar(value: number) {
+  return Math.round(value * 1000) / 1000
 }

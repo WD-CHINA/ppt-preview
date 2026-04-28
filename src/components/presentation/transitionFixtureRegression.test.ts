@@ -47,6 +47,7 @@ describe('transition fixture regression', () => {
         style: getTransitionViewportStyle({
           transitionType: descriptor.transitionType,
           transitionDirection: descriptor.transitionDirection,
+          transitionOrientation: frame.current?.slideId ? model.slides[frame.currentSlideIndex]?.transition?.orientation : undefined,
           role: descriptor.transitionRole,
           progress: descriptor.transitionProgress,
           width: frame.width,

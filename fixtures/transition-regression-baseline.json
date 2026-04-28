@@ -324,13 +324,13 @@
           "role": "previous",
           "clipPath": "none",
           "opacity": "1",
-          "transform": "none"
+          "transform": "scaleY(0.5)"
         },
         {
           "role": "current",
           "clipPath": "none",
           "opacity": "1",
-          "transform": "none"
+          "transform": "scaleY(0.5)"
         }
       ]
     }

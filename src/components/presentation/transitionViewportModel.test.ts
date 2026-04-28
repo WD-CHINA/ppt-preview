@@ -80,16 +80,25 @@ describe('transitionViewportModel', () => {
     })
   })
 
-  it('keeps split transitions neutral until a dedicated renderer exists', () => {
-    expect(getTransitionViewportStyle({ transitionType: 'split', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+  it('renders vertical split-out transitions as a scale-based reveal/collapse pair', () => {
+    expect(getTransitionViewportStyle({ transitionType: 'split', transitionOrientation: 'vert', transitionDirection: 'out', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
       opacity: 1,
-      transform: 'none',
+      transform: 'scaleY(0.75)',
       transition: 'none',
     })
-    expect(getTransitionViewportStyle({ transitionType: 'split', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+    expect(getTransitionViewportStyle({ transitionType: 'split', transitionOrientation: 'vert', transitionDirection: 'out', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
       opacity: 1,
-      transform: 'none',
+      transform: 'scaleY(0.25)',
       transition: 'none',
+    })
+  })
+
+  it('supports horizontal split-in transitions', () => {
+    expect(getTransitionViewportStyle({ transitionType: 'split', transitionOrientation: 'horz', transitionDirection: 'in', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      transform: 'scaleX(0.25)',
+    })
+    expect(getTransitionViewportStyle({ transitionType: 'split', transitionOrientation: 'horz', transitionDirection: 'in', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
+      transform: 'scaleX(0.75)',
     })
   })
 

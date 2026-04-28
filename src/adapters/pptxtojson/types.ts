@@ -126,7 +126,7 @@ export interface RawPptxSlide {
         type?: 'color' | 'gradient' | 'image' | 'pattern'
         value?: unknown
       }
-  transition?: { type?: string; direction?: string | null; durationMs?: number; duration?: number; advTm?: number; advanceAfterMs?: number }
+  transition?: { type?: string; direction?: string | null; orientation?: string | null; durationMs?: number; duration?: number; advTm?: number; advanceAfterMs?: number }
   elements?: RawPptxElement[]
   layoutElements?: RawPptxElement[]
   autoplay?: { advanceOnClick?: boolean; advanceAfterMs?: number }

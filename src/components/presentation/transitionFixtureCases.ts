@@ -124,7 +124,7 @@ export const transitionFixtureCases: TransitionFixtureCase[] = [
         role: 'previous',
         style: {
           opacity: 1,
-          transform: 'none',
+          transform: 'scaleY(0.5)',
           transition: 'none',
         },
       },
@@ -132,7 +132,7 @@ export const transitionFixtureCases: TransitionFixtureCase[] = [
         role: 'current',
         style: {
           opacity: 1,
-          transform: 'none',
+          transform: 'scaleY(0.5)',
           transition: 'none',
         },
       },
