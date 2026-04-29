@@ -29,6 +29,7 @@ export function evaluatePresentationFrame(
     transitionProgress: state.transitionProgress,
     transitionType: transitionSlide?.transition?.type,
     transitionDirection: transitionSlide?.transition?.direction,
+    transitionOrientation: transitionSlide?.transition?.orientation,
     previous: isTransitioning
       ? evaluateSlideFrame(model.slides[state.transitionFromSlideIndex ?? -1])
       : evaluateSlideFrame(model.slides[currentSlideIndex - 1]),

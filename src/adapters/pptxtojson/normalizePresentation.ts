@@ -633,8 +633,20 @@ function normalizeTableCell(input: unknown): NormalizedTableCell {
   if (typeof rawCell.italic === 'boolean') cell.fontItalic = rawCell.italic
   if (typeof rawCell.fontUnderline === 'boolean') cell.fontUnderline = rawCell.fontUnderline
   if (typeof rawCell.underline === 'boolean') cell.fontUnderline = rawCell.underline
+  if (typeof rawCell.fontStrike === 'boolean') cell.fontStrike = rawCell.fontStrike
+  if (typeof rawCell.strike === 'boolean') cell.fontStrike = rawCell.strike
   if (typeof rawCell.fontColor === 'string') cell.fontColor = rawCell.fontColor
   if (typeof rawCell.fillColor === 'string') cell.fillColor = rawCell.fillColor
+  if (typeof rawCell.highlightColor === 'string') cell.highlightColor = rawCell.highlightColor
+  if (typeof rawCell.lang === 'string') cell.language = rawCell.lang
+  if (typeof rawCell.language === 'string') cell.language = rawCell.language
+  if (typeof rawCell.textTransform === 'string') cell.textTransform = rawCell.textTransform
+
+  const letterSpacing = normalizeTableCellLetterSpacing(rawCell)
+  if (letterSpacing !== undefined) cell.letterSpacing = letterSpacing
+
+  const padding = normalizeTableCellPadding(rawCell)
+  if (padding) cell.padding = padding
 
   cell.borders = normalizeTableBorders(rawCell.borders)
 
@@ -662,6 +674,38 @@ function normalizeTableCellFontSize(rawCell: Record<string, unknown>) {
 
   const pointSize = numericValue > 400 ? numericValue / 100 : numericValue
   return normalizePointLength(pointSize, 0)
+}
+
+function normalizeTableCellLetterSpacing(rawCell: Record<string, unknown>) {
+  const rawValue = rawCell.letterSpacing ?? rawCell.fontSpace ?? rawCell.spc
+  const numericValue = typeof rawValue === 'number' ? rawValue : typeof rawValue === 'string' ? Number.parseFloat(rawValue) : undefined
+
+  if (typeof numericValue !== 'number' || !Number.isFinite(numericValue)) {
+    return undefined
+  }
+
+  return numericValue
+}
+
+function normalizeTableCellPadding(rawCell: Record<string, unknown>) {
+  const left = normalizeTablePaddingValue(rawCell.marginLeft ?? rawCell.marL)
+  const right = normalizeTablePaddingValue(rawCell.marginRight ?? rawCell.marR)
+  const top = normalizeTablePaddingValue(rawCell.marginTop ?? rawCell.marT)
+  const bottom = normalizeTablePaddingValue(rawCell.marginBottom ?? rawCell.marB)
+
+  if (left === undefined && right === undefined && top === undefined && bottom === undefined) {
+    return undefined
+  }
+
+  return { left, right, top, bottom }
+}
+
+function normalizeTablePaddingValue(input: unknown) {
+  if (typeof input !== 'number' || !Number.isFinite(input)) {
+    return undefined
+  }
+
+  return normalizePointLength(input, 0)
 }
 
 function normalizeTableBorders(input: unknown): NormalizedTableCell['borders'] {
@@ -721,6 +765,7 @@ function normalizeShapeMeta(rawElement: RawPptxElement) {
     lineTailEnd: rawElement.lineTailEnd,
     vAlign: rawElement.vAlign,
     isVertical: rawElement.isVertical,
+    verticalMode: typeof rawElement.verticalMode === 'string' ? rawElement.verticalMode : undefined,
     isFlipH: rawElement.isFlipH,
     isFlipV: rawElement.isFlipV,
     textInset: rawElement.textBodyInset

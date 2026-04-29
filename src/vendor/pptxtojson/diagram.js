@@ -89,44 +89,163 @@ export async function getDiagramNodeContext(node, warpObj) {
   }
 }
 
-export function getSmartArtTextData(dataContent) {
-  const result = []
+function toArray(value) {
+  if (!value) return []
+  return Array.isArray(value) ? value : [value]
+}
 
-  let ptLst = getTextByPathList(dataContent, ['dgm:dataModel', 'dgm:ptLst', 'dgm:pt'])
+function extractSmartArtNodeText(pt) {
+  const textBody = getTextByPathList(pt, ['dgm:t'])
+  if (!textBody) return ''
 
-  if (!ptLst) return result
-  if (!Array.isArray(ptLst)) ptLst = [ptLst]
-
-  for (const pt of ptLst) {
-    const textBody = getTextByPathList(pt, ['dgm:t'])
-
-    if (textBody) {
-      let nodeText = ''
-
-      let paragraphs = getTextByPathList(textBody, ['a:p'])
-      if (paragraphs) {
-        if (!Array.isArray(paragraphs)) paragraphs = [paragraphs]
-
-        paragraphs.forEach(p => {
-          let runs = getTextByPathList(p, ['a:r'])
-          if (runs) {
-            if (!Array.isArray(runs)) runs = [runs]
-
-            runs.forEach(r => {
-              const t = getTextNodeValue(getTextByPathList(r, ['a:t']))
-              if (t && typeof t === 'string') nodeText += t
-            })
-          }
-          if (nodeText.length > 0) nodeText += '\n'
-        })
-      }
-
-      const cleanText = nodeText.trim()
-      if (cleanText) {
-        result.push(cleanText)
-      }
+  let nodeText = ''
+  const paragraphs = toArray(getTextByPathList(textBody, ['a:p']))
+  for (const paragraph of paragraphs) {
+    const runs = toArray(getTextByPathList(paragraph, ['a:r']))
+    for (const run of runs) {
+      const text = getTextNodeValue(getTextByPathList(run, ['a:t']))
+      if (text && typeof text === 'string') nodeText += text
     }
+    if (nodeText.length > 0) nodeText += '\n'
   }
 
-  return result
+  return nodeText.trim()
+}
+
+function normalizeSmartArtPoint(pt) {
+  const modelId = getTextByPathList(pt, ['attrs', 'modelId']) || undefined
+  const type = getTextByPathList(pt, ['attrs', 'type']) || undefined
+  const presentation = getTextByPathList(pt, ['attrs', 'presAssocID'])
+    || getTextByPathList(pt, ['dgm:prSet', 'attrs', 'presAssocID'])
+    || getTextByPathList(pt, ['attrs', 'prSet', 'presAssocID'])
+    || undefined
+  const text = extractSmartArtNodeText(pt) || undefined
+
+  return {
+    id: modelId,
+    type,
+    text,
+    presentationId: presentation,
+  }
+}
+
+function normalizeSmartArtConnection(cxn) {
+  return {
+    id: getTextByPathList(cxn, ['attrs', 'modelId']) || undefined,
+    type: getTextByPathList(cxn, ['attrs', 'type']) || undefined,
+    sourceId: getTextByPathList(cxn, ['attrs', 'srcId']) || undefined,
+    targetId: getTextByPathList(cxn, ['attrs', 'destId']) || undefined,
+    sourceOrder: getTextByPathList(cxn, ['attrs', 'srcOrd']) || undefined,
+    targetOrder: getTextByPathList(cxn, ['attrs', 'destOrd']) || undefined,
+  }
+}
+
+function buildSmartArtTree(nodes, relations) {
+  const nodeMap = new Map()
+  const childIds = new Set()
+
+  for (const node of nodes) {
+    nodeMap.set(node.id, { ...node, children: [] })
+  }
+
+  for (const relation of relations) {
+    if (!relation.sourceId || !relation.targetId) continue
+    const parent = nodeMap.get(relation.sourceId)
+    const child = nodeMap.get(relation.targetId)
+    if (!parent || !child) continue
+    parent.children.push(child)
+    childIds.add(child.id)
+  }
+
+  return nodes
+    .map(node => nodeMap.get(node.id))
+    .filter(node => node && !childIds.has(node.id))
+}
+
+function extractShapeText(shape) {
+  const paragraphs = toArray(getTextByPathList(shape, ['p:txBody', 'a:p']))
+  const lines = []
+
+  for (const paragraph of paragraphs) {
+    let line = ''
+    const runs = toArray(getTextByPathList(paragraph, ['a:r']))
+    for (const run of runs) {
+      const text = getTextNodeValue(getTextByPathList(run, ['a:t']))
+      if (text && typeof text === 'string') line += text
+    }
+    if (line) lines.push(line)
+  }
+
+  return lines.join('\n') || undefined
+}
+
+function normalizeDrawingTarget(shape) {
+  const extShapeProps = getTextByPathList(shape, ['p:nvSpPr', 'p:nvPr', 'p:extLst', 'a:ext', 'dsp:spPr'])
+    || getTextByPathList(shape, ['p:nvSpPr', 'p:nvPr', 'p:extLst', 'a:ext', 'p:spPr'])
+
+  return {
+    shapeId: getTextByPathList(shape, ['p:nvSpPr', 'p:cNvPr', 'attrs', 'id']) || undefined,
+    name: getTextByPathList(shape, ['p:nvSpPr', 'p:cNvPr', 'attrs', 'name']) || undefined,
+    modelId: getTextByPathList(extShapeProps, ['attrs', 'modelId'])
+      || getTextByPathList(shape, ['p:nvSpPr', 'p:nvPr', 'p:ph', 'attrs', 'idx'])
+      || undefined,
+    presentationId: getTextByPathList(extShapeProps, ['attrs', 'presAssocID']) || undefined,
+    text: extractShapeText(shape),
+  }
+}
+
+function mapSmartArtNodesToTargets(nodes, drawingTargets) {
+  const targetsByModelId = new Map()
+  const targetsByPresentationId = new Map()
+  const targetsByText = new Map()
+
+  for (const target of drawingTargets) {
+    if (target.modelId) targetsByModelId.set(target.modelId, target)
+    if (target.presentationId) targetsByPresentationId.set(target.presentationId, target)
+    if (target.text) targetsByText.set(target.text, target)
+  }
+
+  return nodes.map(node => {
+    const visualTarget = (node.id && targetsByModelId.get(node.id))
+      || (node.presentationId && targetsByPresentationId.get(node.presentationId))
+      || (node.text && targetsByText.get(node.text))
+      || undefined
+
+    return {
+      ...node,
+      visualTarget,
+      visualTargetId: visualTarget?.shapeId,
+    }
+  })
+}
+
+export function getSmartArtTextData(dataContent) {
+  return getSmartArtModel(dataContent).nodes
+    .map(node => node.text)
+    .filter(Boolean)
+}
+
+export function getSmartArtModel(dataContent, layoutContent, drawingContent) {
+  const ptLst = toArray(getTextByPathList(dataContent, ['dgm:dataModel', 'dgm:ptLst', 'dgm:pt']))
+  const cxnLst = toArray(getTextByPathList(dataContent, ['dgm:dataModel', 'dgm:cxnLst', 'dgm:cxn']))
+  const nodes = ptLst.map(normalizeSmartArtPoint).filter(node => node.id)
+  const relations = cxnLst.map(normalizeSmartArtConnection).filter(relation => relation.sourceId || relation.targetId)
+  const layoutKind = getTextByPathList(layoutContent, ['dgm:layoutDef', 'attrs', 'uniqueId'])
+    || getTextByPathList(layoutContent, ['dgm:layoutDef', 'attrs', 'type'])
+    || getTextByPathList(layoutContent, ['dgm:layoutDef', 'attrs', 'title'])
+    || undefined
+
+  const drawingShapes = toArray(getTextByPathList(drawingContent, ['p:drawing', 'p:spTree', 'p:sp']))
+  const drawingTargets = drawingShapes
+    .map(normalizeDrawingTarget)
+    .filter(target => target.shapeId || target.name || target.modelId || target.presentationId || target.text)
+  const mappedNodes = mapSmartArtNodesToTargets(nodes, drawingTargets)
+
+  return {
+    layoutKind,
+    nodes: mappedNodes,
+    relations,
+    tree: buildSmartArtTree(mappedNodes, relations),
+    drawingTargets,
+  }
 }

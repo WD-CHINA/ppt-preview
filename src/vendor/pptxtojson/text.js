@@ -1,4 +1,4 @@
-import { getHorizontalAlign, getParagraphSpacing } from './paragraph'
+import { getHorizontalAlign, getParagraphDefaults, getParagraphIndent, getParagraphSpacing, getParagraphTabStops } from './paragraph'
 import { getTextByPathList } from './utils'
 
 import {
@@ -11,6 +11,11 @@ import {
   getFontDecorationLine,
   getFontSpace,
   getFontSubscript,
+  getFontHighlight,
+  getFontCaps,
+  getFontLanguage,
+  getFontScript,
+  getFontKerning,
   getFontShadow,
 } from './fontStyle'
 
@@ -60,12 +65,24 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
 
     const align = getHorizontalAlign(pNode, spNode, type, slideLayoutSpNode, slideMasterSpNode, warpObj)
     const spacing = getParagraphSpacing(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
+    const paragraphIndent = getParagraphIndent(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
+    const tabStops = getParagraphTabStops(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
+    const paragraphDefaults = getParagraphDefaults(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
 
     let styleText = `text-align: ${align};`
     if (spacing) {
       if (spacing.lineSpacing) styleText += `line-height: ${spacing.lineSpacing};`
       if (spacing.spaceBefore) styleText += `margin-top: ${spacing.spaceBefore};`
       if (spacing.spaceAfter) styleText += `margin-bottom: ${spacing.spaceAfter};`
+    }
+    styleText += getListIndentStyle(paragraphIndent)
+    if (paragraphDefaults) {
+      if (paragraphDefaults.rtl !== undefined) styleText += `direction: ${paragraphDefaults.rtl ? 'rtl' : 'ltr'};`
+      if (paragraphDefaults.fontAlign) styleText += `--pptx-font-align: ${paragraphDefaults.fontAlign};`
+      if (paragraphDefaults.defaultTabSize !== undefined) styleText += `--pptx-default-tab-size: ${paragraphDefaults.defaultTabSize}pt;`
+    }
+    if (tabStops) {
+      styleText += `--pptx-tab-stops: ${tabStops.map((tabStop) => `${tabStop.position}pt${tabStop.align ? ` ${tabStop.align}` : ''}`).join(', ')};`
     }
 
     const listType = getListType(pNode)
@@ -161,6 +178,21 @@ export function getListLevel(node) {
   return 0
 }
 
+export function getListIndentStyle(paragraphIndent) {
+  if (!paragraphIndent) return ''
+
+  let styleText = ''
+
+  if (paragraphIndent.marginLeft !== undefined) {
+    styleText += `margin-left: ${paragraphIndent.marginLeft}pt;`
+  }
+  if (paragraphIndent.indent !== undefined) {
+    styleText += `text-indent: ${paragraphIndent.indent}pt;`
+  }
+
+  return styleText
+}
+
 export function genSpanElement(node, pNode, textBodyNode, pFontStyle, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, defaultTextStyle, warpObj) {
   const { styleText, text, hasLink, linkURL } = getSpanStyleInfo(node, pNode, textBodyNode, pFontStyle, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, defaultTextStyle, warpObj)
   const processedText = text.replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;').replace(/\s/g, '&nbsp;')
@@ -169,6 +201,15 @@ export function genSpanElement(node, pNode, textBodyNode, pFontStyle, slideLayou
     return `<span style="${styleText}"><a href="${linkURL}" target="_blank">${processedText}</a></span>`
   }
   return `<span style="${styleText}">${processedText}</span>`
+}
+
+function emuToPoints(value) {
+  if (value === undefined || value === null || value === '') return undefined
+
+  const numericValue = parseInt(value)
+  if (!Number.isFinite(numericValue)) return undefined
+
+  return numericValue / 12700
 }
 
 export function getSpanStyleInfo(node, pNode, textBodyNode, pFontStyle, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, defaultTextStyle, warpObj) {
@@ -192,6 +233,11 @@ export function getSpanStyleInfo(node, pNode, textBodyNode, pFontStyle, slideLay
   const fontSpace = getFontSpace(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
   const shadow = getFontShadow(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, warpObj)
   const subscript = getFontSubscript(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
+  const highlight = getFontHighlight(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, warpObj)
+  const textTransform = getFontCaps(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
+  const language = getFontLanguage(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
+  const script = getFontScript(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
+  const kerning = getFontKerning(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
 
   if (fontColor) {
     if (typeof fontColor === 'string') styleText += `color: ${fontColor};`
@@ -209,7 +255,13 @@ export function getSpanStyleInfo(node, pNode, textBodyNode, pFontStyle, slideLay
   if (fontDecoration) styleText += `text-decoration: ${fontDecoration};`
   if (fontDecorationLine) styleText += `text-decoration-line: ${fontDecorationLine};`
   if (fontSpace) styleText += `letter-spacing: ${fontSpace};`
+  if (kerning) styleText += `font-kerning: normal; --pptx-kern: ${kerning};`
   if (subscript) styleText += `vertical-align: ${subscript};`
+  if (highlight) styleText += `background-color: ${highlight};`
+  if (textTransform === 'small-caps') styleText += 'font-variant-caps: small-caps;'
+  else if (textTransform) styleText += `text-transform: ${textTransform};`
+  if (language) styleText += `--pptx-lang: ${language};`
+  if (script) styleText += `--pptx-script: ${script};`
   if (shadow) styleText += `text-shadow: ${shadow};`
 
   const linkID = getTextByPathList(node, ['a:rPr', 'a:hlinkClick', 'attrs', 'r:id'])

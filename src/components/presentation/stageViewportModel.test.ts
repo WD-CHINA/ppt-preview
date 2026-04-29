@@ -34,6 +34,7 @@ describe('stageViewportModel', () => {
         transitionProgress: 1,
         transitionRole: undefined,
         transitionType: undefined,
+        transitionOrientation: undefined,
       },
     ])
   })
@@ -46,6 +47,7 @@ describe('stageViewportModel', () => {
         transitionProgress: 0.4,
         transitionType: 'push',
         transitionDirection: 'u',
+        transitionOrientation: 'vert',
       }),
     ).toEqual([
       {
@@ -56,6 +58,7 @@ describe('stageViewportModel', () => {
         transitionRole: 'previous',
         transitionType: 'push',
         transitionDirection: 'u',
+        transitionOrientation: 'vert',
       },
       {
         key: 'current-slide-2',
@@ -65,6 +68,7 @@ describe('stageViewportModel', () => {
         transitionRole: 'current',
         transitionType: 'push',
         transitionDirection: 'u',
+        transitionOrientation: 'vert',
       },
     ])
   })

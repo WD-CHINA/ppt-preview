@@ -13,8 +13,8 @@ import { getTableBorders, getTableCellParams, getTableRowParams } from './table'
 import { RATIO_EMUs_Points } from './constants'
 import { findOMath, latexFormart, parseOMath } from './math'
 import { getShapePath } from './shapePath'
-import { parseTransition, findTransitionNode } from './animation'
-import { getDiagramNodeContext, getSmartArtTextData } from './diagram'
+import { parseTransition, parseAnimations, findTransitionNode, findTimingNode, findBuildListNode } from './animation'
+import { getDiagramNodeContext, getSmartArtModel, getSmartArtTextData } from './diagram'
 
 export async function parse(file, options = {}) {
   const slides = []
@@ -315,7 +315,10 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   if (!transitionNode) transitionNode = findTransitionNode(slideLayoutContent, 'p:sldLayout')
   if (!transitionNode) transitionNode = findTransitionNode(slideMasterContent, 'p:sldMaster')
 
+  const timingNode = findTimingNode(slideContent, 'p:sld')
+  const buildListNode = findBuildListNode(slideContent, 'p:sld')
   const transition = parseTransition(transitionNode)
+  const animations = parseAnimations(timingNode, buildListNode)
 
   return {
     fill,
@@ -323,6 +326,13 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
     layoutElements,
     note,
     transition,
+    animations,
+    autoplay: transition && transition.advanceAfterMs != null
+      ? {
+          advanceOnClick: transition.advClick !== false,
+          advanceAfterMs: transition.advanceAfterMs,
+        }
+      : undefined,
   }
 }
 
@@ -342,6 +352,115 @@ function getHyperlinkFromCNvPr(cNvPr, warpObj) {
   if (!target || !/^https?:\/\//.test(target)) return null
 
   return target
+}
+
+function readTextBodyInset(node, slideLayoutSpNode, slideMasterSpNode) {
+  const bodyPr =
+    getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs']) ||
+    getTextByPathList(slideLayoutSpNode, ['p:txBody', 'a:bodyPr', 'attrs']) ||
+    getTextByPathList(slideMasterSpNode, ['p:txBody', 'a:bodyPr', 'attrs'])
+
+  return {
+    left: readInset(bodyPr, 'lIns', 91440),
+    right: readInset(bodyPr, 'rIns', 91440),
+    top: readInset(bodyPr, 'tIns', 45720),
+    bottom: readInset(bodyPr, 'bIns', 45720),
+  }
+}
+
+function readInset(bodyPr, key, defaultEmu) {
+  const rawValue = bodyPr ? bodyPr[key] : undefined
+  const parsed = rawValue == null ? Number.NaN : Number(rawValue)
+  const emu = Number.isFinite(parsed) ? parsed : defaultEmu
+  return numberToFixed(emu * RATIO_EMUs_Points)
+}
+
+function readPlaceholderMetadata(node, slideLayoutSpNode, slideMasterSpNode) {
+  const placeholderAttrs =
+    getTextByPathList(node, ['p:nvSpPr', 'p:nvPr', 'p:ph', 'attrs']) ||
+    getTextByPathList(node, ['p:nvCxnSpPr', 'p:nvPr', 'p:ph', 'attrs']) ||
+    getTextByPathList(node, ['p:nvPicPr', 'p:nvPr', 'p:ph', 'attrs']) ||
+    getTextByPathList(slideLayoutSpNode, ['p:nvSpPr', 'p:nvPr', 'p:ph', 'attrs']) ||
+    getTextByPathList(slideMasterSpNode, ['p:nvSpPr', 'p:nvPr', 'p:ph', 'attrs'])
+
+  if (!placeholderAttrs) {
+    return { type: undefined, index: undefined }
+  }
+
+  const rawIndex = placeholderAttrs.idx
+  const parsedIndex = rawIndex == null ? Number.NaN : Number(rawIndex)
+
+  return {
+    type: placeholderAttrs.type,
+    index: Number.isFinite(parsedIndex) ? parsedIndex : undefined,
+  }
+}
+
+function readLineMarkers(node) {
+  const lineNode =
+    getTextByPathList(node, ['p:spPr', 'a:ln']) ||
+    getTextByPathList(node, ['p:cxnSpPr', 'a:ln'])
+
+  return {
+    head: readLineEnd(getTextByPathList(lineNode, ['a:headEnd', 'attrs'])),
+    tail: readLineEnd(getTextByPathList(lineNode, ['a:tailEnd', 'attrs'])),
+  }
+}
+
+function readBulletMarkers(node) {
+  const textBody = getTextByPathList(node, ['p:txBody'])
+  const paragraphs = textBody && textBody['a:p']
+  if (!paragraphs) return []
+
+  const paragraphList = Array.isArray(paragraphs) ? paragraphs : [paragraphs]
+  const markers = []
+
+  for (const paragraph of paragraphList) {
+    const char = getTextByPathList(paragraph, ['a:buChar', 'attrs', 'char'])
+    const autoNumber = getTextByPathList(paragraph, ['a:buAutoNum'])
+    if (!char && !autoNumber) continue
+
+    const paragraphAttrs = getTextByPathList(paragraph, ['a:pPr', 'attrs']) || {}
+    const marginLeft = emuValueToPoints(paragraphAttrs.marL)
+    const indent = emuValueToPoints(paragraphAttrs.indent)
+
+    markers.push({
+      char: char || '',
+      fontFace: getTextByPathList(paragraph, ['a:buFont', 'attrs', 'typeface']),
+      level: paragraphAttrs.lvl !== undefined ? parseInt(paragraphAttrs.lvl) : 0,
+      marginLeft,
+      indent,
+      hanging: getHangingIndent(marginLeft, indent),
+      listType: autoNumber ? 'ol' : 'ul',
+    })
+  }
+
+  return markers
+}
+
+function emuValueToPoints(value) {
+  if (value === undefined || value === null || value === '') return undefined
+
+  const numericValue = parseInt(value)
+  if (!Number.isFinite(numericValue)) return undefined
+
+  return numericValue * RATIO_EMUs_Points
+}
+
+function getHangingIndent(marginLeft, indent) {
+  if (typeof indent === 'number' && indent < 0) return Math.abs(indent)
+  if (typeof marginLeft === 'number' && typeof indent === 'number' && marginLeft > indent) return marginLeft - indent
+  return undefined
+}
+
+function readLineEnd(attrs) {
+  if (!attrs || !attrs.type || attrs.type === 'none') return undefined
+
+  return {
+    type: attrs.type,
+    width: attrs.w,
+    length: attrs.len,
+  }
 }
 
 function getNote(noteContent) {
@@ -773,8 +892,14 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   if (outerShdwNode) shadow = getShadow(outerShdwNode, warpObj)
 
   const vAlign = getVerticalAlign(node, slideLayoutSpNode, slideMasterSpNode, type)
-  const isVertical = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'vert']) === 'eaVert'
+  const verticalMode = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'vert'])
+  const isVertical = verticalMode !== undefined && verticalMode !== null && verticalMode !== 'horz'
   const autoFit = getTextAutoFit(node, slideLayoutSpNode, slideMasterSpNode)
+
+  const textBodyInset = readTextBodyInset(node, slideLayoutSpNode, slideMasterSpNode)
+  const placeholder = readPlaceholderMetadata(node, slideLayoutSpNode, slideMasterSpNode)
+  const lineMarkers = readLineMarkers(node)
+  const bulletMarkers = readBulletMarkers(node)
 
   const data = {
     left,
@@ -793,6 +918,14 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
     vAlign,
     name,
     order,
+    textBodyInset,
+    placeholderType: placeholder.type,
+    placeholderIndex: placeholder.index,
+    lineHeadEnd: lineMarkers.head,
+    lineTailEnd: lineMarkers.tail,
+    bulletMarkers,
+    isVertical,
+    verticalMode,
   }
 
   if (shadow) data.shadow = shadow
@@ -1139,6 +1272,7 @@ async function genTable(node, warpObj) {
       fillColor,
       fontColor,
       fontBold,
+      fontItalic,
     } = getTableRowParams(trNodes, i, tblStylAttrObj, thisTblStyle, warpObj)
 
     const tcNodes = trNode['a:tc']
@@ -1147,43 +1281,55 @@ async function genTable(node, warpObj) {
     if (tcNodes.constructor === Array) {
       for (let j = 0; j < tcNodes.length; j++) {
         const tcNode = tcNodes[j]
-        let a_sorce
-        if (j === 0 && tblStylAttrObj['isFrstColAttr'] === 1) {
-          a_sorce = 'a:firstCol'
-          if (tblStylAttrObj['isLstRowAttr'] === 1 && i === (trNodes.length - 1) && getTextByPathList(thisTblStyle, ['a:seCell'])) {
-            a_sorce = 'a:seCell'
-          } 
-          else if (tblStylAttrObj['isFrstRowAttr'] === 1 && i === 0 &&
-            getTextByPathList(thisTblStyle, ['a:neCell'])) {
-            a_sorce = 'a:neCell'
+        const cellSources = []
+        const isFirstRow = i === 0
+        const isLastRow = i === (trNodes.length - 1)
+        const isFirstCol = j === 0
+        const isLastCol = j === (tcNodes.length - 1)
+
+        if (!isFirstCol && !isLastCol && tblStylAttrObj['isBandColAttr'] === 1) {
+          if ((j % 2) === 0 && getTextByPathList(thisTblStyle, ['a:band1V'])) {
+            cellSources.push('a:band1V')
           }
-        } 
-        else if (
-          (j > 0 && tblStylAttrObj['isBandColAttr'] === 1) &&
-          !(tblStylAttrObj['isFrstColAttr'] === 1 && i === 0) &&
-          !(tblStylAttrObj['isLstRowAttr'] === 1 && i === (trNodes.length - 1)) &&
-          j !== (tcNodes.length - 1)
-        ) {
-          if ((j % 2) !== 0) {
-            let aBandNode = getTextByPathList(thisTblStyle, ['a:band2V'])
-            if (aBandNode === undefined) {
-              aBandNode = getTextByPathList(thisTblStyle, ['a:band1V'])
-              if (aBandNode) a_sorce = 'a:band2V'
-            } 
-            else a_sorce = 'a:band2V'
+          else if ((j % 2) !== 0 && getTextByPathList(thisTblStyle, ['a:band2V'])) {
+            cellSources.push('a:band2V')
+          }
+          else if ((j % 2) === 0 && getTextByPathList(thisTblStyle, ['a:band2V'])) {
+            cellSources.push('a:band2V')
+          }
+          else if ((j % 2) !== 0 && getTextByPathList(thisTblStyle, ['a:band1V'])) {
+            cellSources.push('a:band1V')
           }
         }
-        if (j === (tcNodes.length - 1) && tblStylAttrObj['isLstColAttr'] === 1) {
-          a_sorce = 'a:lastCol'
-          if (tblStylAttrObj['isLstRowAttr'] === 1 && i === (trNodes.length - 1) && getTextByPathList(thisTblStyle, ['a:swCell'])) {
-            a_sorce = 'a:swCell'
-          } 
-          else if (tblStylAttrObj['isFrstRowAttr'] === 1 && i === 0 && getTextByPathList(thisTblStyle, ['a:nwCell'])) {
-            a_sorce = 'a:nwCell'
-          }
+
+        if (isFirstRow && tblStylAttrObj['isFrstRowAttr'] === 1) {
+          cellSources.push('a:firstRow')
         }
+        if (isLastRow && tblStylAttrObj['isLstRowAttr'] === 1) {
+          cellSources.push('a:lastRow')
+        }
+        if (isFirstCol && tblStylAttrObj['isFrstColAttr'] === 1) {
+          cellSources.push('a:firstCol')
+        }
+        if (isLastCol && tblStylAttrObj['isLstColAttr'] === 1) {
+          cellSources.push('a:lastCol')
+        }
+
+        if (isFirstRow && isFirstCol && getTextByPathList(thisTblStyle, ['a:nwCell'])) {
+          cellSources.push('a:nwCell')
+        }
+        if (isFirstRow && isLastCol && getTextByPathList(thisTblStyle, ['a:neCell'])) {
+          cellSources.push('a:neCell')
+        }
+        if (isLastRow && isFirstCol && getTextByPathList(thisTblStyle, ['a:swCell'])) {
+          cellSources.push('a:swCell')
+        }
+        if (isLastRow && isLastCol && getTextByPathList(thisTblStyle, ['a:seCell'])) {
+          cellSources.push('a:seCell')
+        }
+
         const text = genTextBody(tcNode['a:txBody'], tcNode, undefined, undefined, undefined, warpObj)
-        const cell = await getTableCellParams(tcNode, thisTblStyle, a_sorce, warpObj)
+        const cell = await getTableCellParams(tcNode, thisTblStyle, cellSources, warpObj)
         const td = { text }
         if (cell.rowSpan) td.rowSpan = cell.rowSpan
         if (cell.colSpan) td.colSpan = cell.colSpan
@@ -1191,32 +1337,52 @@ async function genTable(node, warpObj) {
         if (cell.hMerge) td.hMerge = cell.hMerge
         if (cell.vAlign) td.vAlign = cell.vAlign
         if (cell.fontBold || fontBold) td.fontBold = cell.fontBold || fontBold
+        if (cell.fontItalic || fontItalic) td.fontItalic = cell.fontItalic || fontItalic
+        if (cell.fontUnderline) td.fontUnderline = cell.fontUnderline
+        if (cell.fontStrike) td.fontStrike = cell.fontStrike
+        if (cell.fontFamily) td.fontFamily = cell.fontFamily
+        if (cell.fontSize) td.fontSize = cell.fontSize
         if (cell.fontColor || fontColor) td.fontColor = cell.fontColor || fontColor
         if (cell.fillColor || fillColor || tbl_bgcolor) td.fillColor = cell.fillColor || fillColor || tbl_bgcolor
+        if (cell.highlightColor) td.highlightColor = cell.highlightColor
+        if (cell.letterSpacing !== undefined) td.letterSpacing = cell.letterSpacing
+        if (cell.textTransform) td.textTransform = cell.textTransform
+        if (cell.lang) td.lang = cell.lang
+        if (cell.marginLeft !== undefined) td.marginLeft = cell.marginLeft
+        if (cell.marginRight !== undefined) td.marginRight = cell.marginRight
+        if (cell.marginTop !== undefined) td.marginTop = cell.marginTop
+        if (cell.marginBottom !== undefined) td.marginBottom = cell.marginBottom
         if (cell.borders) td.borders = cell.borders
 
         tr.push(td)
       }
     } 
     else {
-      let a_sorce
-      if (tblStylAttrObj['isFrstColAttr'] === 1 && tblStylAttrObj['isLstRowAttr'] !== 1) {
-        a_sorce = 'a:firstCol'
-      } 
-      else if (tblStylAttrObj['isBandColAttr'] === 1 && tblStylAttrObj['isLstRowAttr'] !== 1) {
-        let aBandNode = getTextByPathList(thisTblStyle, ['a:band2V'])
-        if (!aBandNode) {
-          aBandNode = getTextByPathList(thisTblStyle, ['a:band1V'])
-          if (aBandNode) a_sorce = 'a:band2V'
-        } 
-        else a_sorce = 'a:band2V'
+      const cellSources = []
+      const isFirstRow = i === 0
+      const isLastRow = i === (trNodes.length - 1)
+
+      if (tblStylAttrObj['isFrstRowAttr'] === 1 && isFirstRow) {
+        cellSources.push('a:firstRow')
       }
-      if (tblStylAttrObj['isLstColAttr'] === 1 && tblStylAttrObj['isLstRowAttr'] !== 1) {
-        a_sorce = 'a:lastCol'
+      if (tblStylAttrObj['isLstRowAttr'] === 1 && isLastRow) {
+        cellSources.push('a:lastRow')
+      }
+      if (tblStylAttrObj['isFrstColAttr'] === 1) {
+        cellSources.push('a:firstCol')
+      }
+      if (tblStylAttrObj['isLstColAttr'] === 1) {
+        cellSources.push('a:lastCol')
+      }
+      if (isFirstRow && getTextByPathList(thisTblStyle, ['a:nwCell'])) {
+        cellSources.push('a:nwCell')
+      }
+      if (isLastRow && getTextByPathList(thisTblStyle, ['a:swCell'])) {
+        cellSources.push('a:swCell')
       }
 
       const text = genTextBody(tcNodes['a:txBody'], tcNodes, undefined, undefined, undefined, warpObj)
-      const cell = await getTableCellParams(tcNodes, thisTblStyle, a_sorce, warpObj)
+      const cell = await getTableCellParams(tcNodes, thisTblStyle, cellSources, warpObj)
       const td = { text }
       if (cell.rowSpan) td.rowSpan = cell.rowSpan
       if (cell.colSpan) td.colSpan = cell.colSpan
@@ -1224,8 +1390,21 @@ async function genTable(node, warpObj) {
       if (cell.hMerge) td.hMerge = cell.hMerge
       if (cell.vAlign) td.vAlign = cell.vAlign
       if (cell.fontBold || fontBold) td.fontBold = cell.fontBold || fontBold
+      if (cell.fontItalic) td.fontItalic = cell.fontItalic
+      if (cell.fontUnderline) td.fontUnderline = cell.fontUnderline
+      if (cell.fontStrike) td.fontStrike = cell.fontStrike
+      if (cell.fontFamily) td.fontFamily = cell.fontFamily
+      if (cell.fontSize) td.fontSize = cell.fontSize
       if (cell.fontColor || fontColor) td.fontColor = cell.fontColor || fontColor
       if (cell.fillColor || fillColor || tbl_bgcolor) td.fillColor = cell.fillColor || fillColor || tbl_bgcolor
+      if (cell.highlightColor) td.highlightColor = cell.highlightColor
+      if (cell.letterSpacing !== undefined) td.letterSpacing = cell.letterSpacing
+      if (cell.textTransform) td.textTransform = cell.textTransform
+      if (cell.lang) td.lang = cell.lang
+      if (cell.marginLeft !== undefined) td.marginLeft = cell.marginLeft
+      if (cell.marginRight !== undefined) td.marginRight = cell.marginRight
+      if (cell.marginTop !== undefined) td.marginTop = cell.marginTop
+      if (cell.marginBottom !== undefined) td.marginBottom = cell.marginBottom
       if (cell.borders) td.borders = cell.borders
 
       tr.push(td)
@@ -1263,9 +1442,10 @@ async function genChart(node, warpObj) {
   if (!refName) return null
 
   const content = await readXmlFile(warpObj['zip'], refName)
-  const plotArea = getTextByPathList(content, ['c:chartSpace', 'c:chart', 'c:plotArea'])
+  const chartNode = getTextByPathList(content, ['c:chartSpace', 'c:chart'])
+  const plotArea = getTextByPathList(chartNode, ['c:plotArea'])
 
-  const chart = getChartInfo(plotArea, warpObj)
+  const chart = getChartInfo(plotArea, warpObj, chartNode)
 
   if (!chart) return null
 
@@ -1284,7 +1464,20 @@ async function genChart(node, warpObj) {
   if (chart.barDir !== undefined) data.barDir = chart.barDir
   if (chart.holeSize !== undefined) data.holeSize = chart.holeSize
   if (chart.grouping !== undefined) data.grouping = chart.grouping
+  if (chart.stacked !== undefined) data.stacked = chart.stacked
+  if (chart.percentStacked !== undefined) data.percentStacked = chart.percentStacked
+  if (chart.series !== undefined) data.series = chart.series
+  if (chart.seriesOrder !== undefined) data.seriesOrder = chart.seriesOrder
+  if (chart.schema !== undefined) data.schema = chart.schema
+  if (chart.semantics !== undefined) data.semantics = chart.semantics
   if (chart.style !== undefined) data.style = chart.style
+  if (chart.title !== undefined) data.title = chart.title
+  if (chart.legend !== undefined) data.legend = chart.legend
+  if (chart.dataLabels !== undefined) data.dataLabels = chart.dataLabels
+  if (chart.categoryAxis !== undefined) data.categoryAxis = chart.categoryAxis
+  if (chart.valueAxis !== undefined) data.valueAxis = chart.valueAxis
+  if (chart.seriesAxis !== undefined) data.seriesAxis = chart.seriesAxis
+  if (chart.dateAxis !== undefined) data.dateAxis = chart.dateAxis
 
   return data
 }
@@ -1299,6 +1492,7 @@ async function genDiagram(node, warpObj) {
   const dgmDrwSpArray = getTextByPathList(diagramWarpObj['digramFileContent'], ['p:drawing', 'p:spTree', 'p:sp'])
   const elements = []
   let textList = []
+  let smartArt = undefined
   if (dgmDrwSpArray) {
     const spList = Array.isArray(dgmDrwSpArray) ? dgmDrwSpArray : [dgmDrwSpArray]
 
@@ -1309,6 +1503,11 @@ async function genDiagram(node, warpObj) {
   }
   if (diagramWarpObj.diagramContent && diagramWarpObj.diagramContent.data) {
     textList = getSmartArtTextData(diagramWarpObj.diagramContent.data)
+    smartArt = getSmartArtModel(
+      diagramWarpObj.diagramContent.data,
+      diagramWarpObj.diagramContent.layout,
+      diagramWarpObj.diagramContent.drawing,
+    )
   }
 
   return {
@@ -1319,6 +1518,12 @@ async function genDiagram(node, warpObj) {
     height,
     elements,
     textList,
+    smartArt,
+    layoutKind: smartArt?.layoutKind,
+    nodes: smartArt?.nodes,
+    relations: smartArt?.relations,
+    tree: smartArt?.tree,
+    drawingTargets: smartArt?.drawingTargets,
     order,
   }
 }

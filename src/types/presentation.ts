@@ -70,6 +70,7 @@ export interface NormalizedShapeMeta {
   lineTailEnd?: LineEndMarker
   vAlign?: 'up' | 'mid' | 'down' | string
   isVertical?: boolean
+  verticalMode?: string
   isFlipH?: boolean
   isFlipV?: boolean
   textInset?: {
@@ -104,8 +105,19 @@ export interface NormalizedTableCell {
   fontBold?: boolean
   fontItalic?: boolean
   fontUnderline?: boolean
+  fontStrike?: boolean
   fontColor?: string
   fillColor?: string
+  highlightColor?: string
+  letterSpacing?: number
+  language?: string
+  textTransform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none' | string
+  padding?: {
+    left?: number
+    right?: number
+    top?: number
+    bottom?: number
+  }
   borders?: Partial<Record<'top' | 'right' | 'bottom' | 'left', NormalizedTableBorder>>
 }
 
@@ -242,6 +254,7 @@ export interface PresentationFrame {
   transitionProgress: number
   transitionType?: string
   transitionDirection?: string
+  transitionOrientation?: string
   current?: EvaluatedSlideFrame
   previous?: EvaluatedSlideFrame
   next?: EvaluatedSlideFrame

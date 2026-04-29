@@ -62,6 +62,7 @@ export interface RawPptxElement {
   shapType?: string
   vAlign?: 'up' | 'mid' | 'down' | string
   isVertical?: boolean
+  verticalMode?: string
   isFlipH?: boolean
   isFlipV?: boolean
   textBodyInset?: RawTextBodyInset
@@ -69,6 +70,7 @@ export interface RawPptxElement {
   placeholderIndex?: number
   lineHeadEnd?: RawLineEnd
   lineTailEnd?: RawLineEnd
+  bulletMarkers?: RawBulletMarker[]
   rect?: RawMediaRect
   [key: string]: unknown
 }
@@ -84,6 +86,16 @@ export interface RawLineEnd {
   type?: string
   width?: string
   length?: string
+}
+
+export interface RawBulletMarker {
+  char?: string
+  fontFace?: string
+  level?: number
+  marginLeft?: number
+  indent?: number
+  hanging?: number
+  listType?: 'ul' | 'ol'
 }
 
 export interface RawMediaRect {

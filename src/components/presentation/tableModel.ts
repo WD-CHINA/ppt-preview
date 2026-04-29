@@ -51,17 +51,24 @@ export function getTableCellStyle(
 ): CSSProperties {
   const typography = getTableCellTypography(cell, position, table)
 
+  const textDecoration = [
+    cell.fontUnderline ? 'underline' : '',
+    cell.fontStrike ? 'line-through' : '',
+  ].filter(Boolean).join(' ') || undefined
+
   return {
     gridColumn: cell.colSpan && cell.colSpan > 1 ? `span ${cell.colSpan}` : undefined,
     gridRow: cell.rowSpan && cell.rowSpan > 1 ? `span ${cell.rowSpan}` : undefined,
     alignItems: mapTableVerticalAlign(cell.vAlign),
-    background: cell.fillColor,
+    background: cell.highlightColor ?? cell.fillColor,
     color: cell.fontColor,
     fontFamily: cell.fontFamily,
     fontSize: typeof typography.fontSize === 'number' ? `${formatPx(typography.fontSize)}px` : undefined,
     fontWeight: cell.fontBold ? '700' : undefined,
     fontStyle: cell.fontItalic ? 'italic' : undefined,
-    textDecoration: cell.fontUnderline ? 'underline' : undefined,
+    textDecoration,
+    textTransform: cell.textTransform,
+    letterSpacing: typeof cell.letterSpacing === 'number' ? `${formatPx(cell.letterSpacing)}px` : undefined,
     lineHeight: typography.lineHeight,
     padding: typography.padding,
     wordBreak: typography.wordBreak,
@@ -111,20 +118,43 @@ function getTableCellTypography(
     }
   }
 
+  const explicitPadding = formatTableCellPadding(cell.padding)
+
   if (fontSize > 0 && fontSize <= 16) {
     return {
       fontSize,
       lineHeight: '1.35',
-      padding: '6px 8px',
+      padding: explicitPadding ?? '6px 8px',
     }
   }
 
   return {
     fontSize: fontSize || undefined,
     lineHeight: '1.25',
-    padding: '4px 6px',
+    padding: explicitPadding ?? '4px 6px',
   }
 }
+
+function formatTableCellPadding(padding?: NormalizedTableCell['padding']) {
+  if (!padding) {
+    return undefined
+  }
+
+  const top = formatPaddingSide(padding.top, 4)
+  const right = formatPaddingSide(padding.right, 6)
+  const bottom = formatPaddingSide(padding.bottom, 4)
+  const left = formatPaddingSide(padding.left, 6)
+  return `${top}px ${right}px ${bottom}px ${left}px`
+}
+
+function formatPaddingSide(value: number | undefined, fallbackPoints: number) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return formatPx(value)
+  }
+
+  return formatPx(pointToCssPx(fallbackPoints))
+}
+
 
 function getEffectiveTableCellFontSize(cell: NormalizedTableCell) {
   const htmlFontSizes = extractRunFontSizes(cell.text)

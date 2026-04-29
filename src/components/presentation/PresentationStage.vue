@@ -102,6 +102,7 @@ onBeforeUnmount(() => {
           :transition-progress="descriptor.transitionProgress"
           :transition-type="descriptor.transitionType"
           :transition-direction="descriptor.transitionDirection"
+          :transition-orientation="descriptor.transitionOrientation"
           :transition-role="descriptor.transitionRole"
         />
       </div>

@@ -13,6 +13,7 @@ const props = defineProps<{
   transitionRole?: 'current' | 'previous'
   transitionType?: string
   transitionDirection?: string
+  transitionOrientation?: string
 }>()
 
 const viewportStyle = computed(() => {
@@ -31,6 +32,7 @@ const viewportStyle = computed(() => {
     ...getTransitionViewportStyle({
       transitionType: props.transitionType,
       transitionDirection: props.transitionDirection,
+      transitionOrientation: props.transitionOrientation,
       role: props.transitionRole,
       progress: props.transitionProgress,
       width: props.width,

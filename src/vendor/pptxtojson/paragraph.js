@@ -80,34 +80,56 @@ export function getVerticalAlign(node, slideLayoutSpNode, slideMasterSpNode) {
 }
 
 export function getTextAutoFit(node, slideLayoutSpNode, slideMasterSpNode) {
-  function checkBodyPr(bodyPr) {
+  function checkBodyPr(bodyPr, source) {
     if (!bodyPr) return null
 
-    if (bodyPr['a:noAutofit']) return { result: null }
-    else if (bodyPr['a:spAutoFit']) return { result: { type: 'shape' } }
-    else if (bodyPr['a:normAutofit']) {
-      const fontScale = getTextByPathList(bodyPr['a:normAutofit'], ['attrs', 'fontScale'])
-      if (fontScale) {
-        const scalePercent = parseInt(fontScale) / 1000
-        return {
-          result: {
-            type: 'text',
-            fontScale: scalePercent,
-          }
+    if (bodyPr['a:noAutofit']) {
+      return {
+        result: {
+          type: 'none',
+          enabled: false,
+          source,
         }
       }
-      return { result: { type: 'text' } }
+    }
+    else if (bodyPr['a:spAutoFit']) {
+      return {
+        result: {
+          type: 'shape',
+          enabled: true,
+          source,
+        }
+      }
+    }
+    else if (bodyPr['a:normAutofit']) {
+      const normAutofitNode = bodyPr['a:normAutofit']
+      const fontScale = getTextByPathList(normAutofitNode, ['attrs', 'fontScale'])
+      const lnSpcReduction = getTextByPathList(normAutofitNode, ['attrs', 'lnSpcReduction'])
+      const result = {
+        type: 'text',
+        enabled: true,
+        source,
+      }
+
+      if (fontScale) {
+        result.fontScale = parseInt(fontScale) / 1000
+      }
+      if (lnSpcReduction) {
+        result.lineSpacingReduction = parseInt(lnSpcReduction) / 1000
+      }
+
+      return { result }
     }
     return null
   }
 
-  const nodeCheck = checkBodyPr(getTextByPathList(node, ['p:txBody', 'a:bodyPr']))
+  const nodeCheck = checkBodyPr(getTextByPathList(node, ['p:txBody', 'a:bodyPr']), 'shape')
   if (nodeCheck) return nodeCheck.result
 
-  const layoutCheck = checkBodyPr(getTextByPathList(slideLayoutSpNode, ['p:txBody', 'a:bodyPr']))
+  const layoutCheck = checkBodyPr(getTextByPathList(slideLayoutSpNode, ['p:txBody', 'a:bodyPr']), 'layout')
   if (layoutCheck) return layoutCheck.result
 
-  const masterCheck = checkBodyPr(getTextByPathList(slideMasterSpNode, ['p:txBody', 'a:bodyPr']))
+  const masterCheck = checkBodyPr(getTextByPathList(slideMasterSpNode, ['p:txBody', 'a:bodyPr']), 'master')
   if (masterCheck) return masterCheck.result
 
   return null
@@ -159,7 +181,7 @@ function appendDefaultTextParagraphStyleNodes(styleNodes, defaultTextStyle, lvl)
   pushParagraphStyleNode(styleNodes, getTextByPathList(defaultTextStyle, ['a:defPPr']))
 }
 
-function getParagraphStyleNodes(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
+export function getParagraphStyleNodes(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
   if (!pNode) return null
 
   const pPrNode = pNode['a:pPr']
@@ -196,6 +218,41 @@ function getParagraphSpacingValue(spacingNode) {
   return undefined
 }
 
+function emuToPoints(value) {
+  if (value === undefined || value === null || value === '') return undefined
+
+  const numericValue = parseInt(value)
+  if (!Number.isFinite(numericValue)) return undefined
+
+  return numericValue / 12700
+}
+
+export function getParagraphIndent(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
+  const styleNodes = getParagraphStyleNodes(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
+  if (!styleNodes) return null
+
+  const indent = {}
+
+  for (const styleNode of styleNodes) {
+    if (indent.marginLeft === undefined) {
+      const marginLeft = emuToPoints(getTextByPathList(styleNode, ['attrs', 'marL']))
+      if (marginLeft !== undefined) indent.marginLeft = marginLeft
+    }
+
+    if (indent.indent === undefined) {
+      const firstLineIndent = emuToPoints(getTextByPathList(styleNode, ['attrs', 'indent']))
+      if (firstLineIndent !== undefined) indent.indent = firstLineIndent
+    }
+  }
+
+  if (indent.marginLeft !== undefined && indent.indent !== undefined) {
+    if (indent.indent < 0) indent.hanging = Math.abs(indent.indent)
+    else if (indent.marginLeft > indent.indent) indent.hanging = indent.marginLeft - indent.indent
+  }
+
+  return Object.keys(indent).length > 0 ? indent : null
+}
+
 export function getParagraphSpacing(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
   const styleNodes = getParagraphStyleNodes(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
   if (!styleNodes) return null
@@ -220,4 +277,57 @@ export function getParagraphSpacing(pNode, textBodyNode, slideLayoutSpNode, slid
   }
 
   return Object.keys(spacing).length > 0 ? spacing : null
+}
+
+export function getParagraphTabStops(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
+  const styleNodes = getParagraphStyleNodes(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
+  if (!styleNodes) return null
+
+  for (const styleNode of styleNodes) {
+    const tabs = styleNode['a:tabLst'] ? styleNode['a:tabLst']['a:tab'] : undefined
+    if (!tabs) continue
+
+    const tabNodes = tabs.constructor === Array ? tabs : [tabs]
+    const normalizedTabs = tabNodes
+      .map((tabNode) => {
+        const position = emuToPoints(getTextByPathList(tabNode, ['attrs', 'pos']))
+        if (position === undefined) return null
+
+        return {
+          position,
+          align: getTextByPathList(tabNode, ['attrs', 'algn']) || undefined,
+        }
+      })
+      .filter(Boolean)
+
+    if (normalizedTabs.length > 0) return normalizedTabs
+  }
+
+  return null
+}
+
+export function getParagraphDefaults(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
+  const styleNodes = getParagraphStyleNodes(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
+  if (!styleNodes) return null
+
+  const defaults = {}
+
+  for (const styleNode of styleNodes) {
+    if (defaults.rtl === undefined) {
+      const rtl = getTextByPathList(styleNode, ['attrs', 'rtl'])
+      if (rtl !== undefined && rtl !== '') defaults.rtl = rtl === '1'
+    }
+
+    if (defaults.fontAlign === undefined) {
+      const fontAlign = getTextByPathList(styleNode, ['attrs', 'fontAlgn'])
+      if (fontAlign) defaults.fontAlign = fontAlign
+    }
+
+    if (defaults.defaultTabSize === undefined) {
+      const defaultTabSize = emuToPoints(getTextByPathList(styleNode, ['attrs', 'defTabSz']))
+      if (defaultTabSize !== undefined) defaults.defaultTabSize = defaultTabSize
+    }
+  }
+
+  return Object.keys(defaults).length > 0 ? defaults : null
 }

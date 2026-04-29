@@ -40,6 +40,17 @@ function createImageData(ref = '') {
   }
 }
 
+function detectMimeType(arrayBuffer, fallbackExt) {
+  const bytes = new Uint8Array(arrayBuffer)
+  if (looksLikeSvg(bytes)) return 'image/svg+xml'
+  return getMimeType(fallbackExt)
+}
+
+function looksLikeSvg(bytes) {
+  const head = new TextDecoder('utf-8').decode(bytes.slice(0, 256)).trimStart()
+  return head.startsWith('<svg') || head.startsWith('<?xml')
+}
+
 function createMediaData(ref = '') {
   return {
     ref,
@@ -67,7 +78,7 @@ async function loadMedia(filePath, warpObj, cacheKey, mode = 'base64') {
   if (fileExt === 'xml') return ''
 
   const arrayBuffer = await warpObj['zip'].file(normalizedPath).async('arraybuffer')
-  const mimeType = getMimeType(fileExt)
+  const mimeType = detectMimeType(arrayBuffer, fileExt)
 
   if (mode === 'base64') {
     cacheItem.base64 = `data:${mimeType};base64,${base64ArrayBuffer(arrayBuffer)}`

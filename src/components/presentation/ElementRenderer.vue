@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { CSSProperties } from 'vue'
-import type { EvaluatedElementFrame } from '../../types/presentation'
+import type { EvaluatedElementFrame, NormalizedElement } from '../../types/presentation'
 import TableRenderer from './TableRenderer.vue'
 import MediaRenderer from './MediaRenderer.vue'
 import { createLineMarkerModel } from './lineMarkerModel'
@@ -132,9 +132,42 @@ const shapeLayerStyle = computed<CSSProperties>(() => {
 
 const textBoxStyle = computed<CSSProperties>(() => ({
   justifyContent: shouldApplyVerticalAlign.value ? mapVerticalAlign(props.element.shape?.vAlign) : 'flex-start',
-  writingMode: props.element.shape?.isVertical ? 'vertical-rl' : 'horizontal-tb',
+  writingMode: resolveWritingMode(props.element.shape),
+  textOrientation: resolveTextOrientation(props.element.shape),
   ...formatTextInset(shouldApplyTextInset.value ? props.element.shape?.textInset : undefined),
 }))
+
+function resolveWritingMode(shape?: NormalizedElement['shape']): CSSProperties['writingMode'] {
+  const mode = shape?.verticalMode
+
+  switch (mode) {
+    case 'vert':
+    case 'mongolianVert':
+      return 'vertical-lr'
+    case 'vert270':
+      return 'sideways-rl'
+    case 'wordArtVert':
+    case 'wordArtVertRtl':
+    case 'eaVert':
+      return 'vertical-rl'
+    default:
+      return shape?.isVertical ? 'vertical-rl' : 'horizontal-tb'
+  }
+}
+
+function resolveTextOrientation(shape?: NormalizedElement['shape']): CSSProperties['textOrientation'] {
+  const mode = shape?.verticalMode
+
+  if (mode === 'vert270' || mode === 'wordArtVertRtl') {
+    return 'sideways'
+  }
+
+  if (shape?.isVertical) {
+    return 'mixed'
+  }
+
+  return 'mixed'
+}
 
 const shouldApplyVerticalAlign = computed(() => props.element.type === 'shape')
 

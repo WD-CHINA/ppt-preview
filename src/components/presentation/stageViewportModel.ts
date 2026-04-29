@@ -8,6 +8,7 @@ export interface StageViewportDescriptor {
   transitionRole?: 'current' | 'previous'
   transitionType?: string
   transitionDirection?: string
+  transitionOrientation?: string
 }
 
 export function getStageViewportDescriptors(frame: PresentationFrame): StageViewportDescriptor[] {
@@ -22,6 +23,7 @@ export function getStageViewportDescriptors(frame: PresentationFrame): StageView
       transitionRole: 'previous',
       transitionType: frame.transitionType,
       transitionDirection: frame.transitionDirection,
+      transitionOrientation: frame.transitionOrientation,
     })
   }
 
@@ -33,6 +35,7 @@ export function getStageViewportDescriptors(frame: PresentationFrame): StageView
     transitionRole: frame.isTransitioning ? 'current' : undefined,
     transitionType: frame.isTransitioning ? frame.transitionType : undefined,
     transitionDirection: frame.isTransitioning ? frame.transitionDirection : undefined,
+    transitionOrientation: frame.isTransitioning ? frame.transitionOrientation : undefined,
   })
 
   return descriptors

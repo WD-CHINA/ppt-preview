@@ -1,10 +1,6 @@
 import JSZip from 'jszip'
 import type { RawPptxDocument } from './types'
-import { extractSlideAnimationMetadata, applySlideAnimationMetadata } from './enhancers/slide-animations'
-import { extractSlideLineMarkers, applyLineMarkers } from './enhancers/line-markers'
-import { correctEmbeddedMediaMimeTypes } from './enhancers/media-mime'
-import { extractSlideTransitionMetadata, applySlideTransitionMetadata } from './enhancers/slide-transitions'
-import { extractSlideTextBodyInsets, applyTextBodyInsets } from './enhancers/text-body'
+import { applyCustomBulletMarkers } from './enhancers/bullets'
 
 export async function enrichTextBodyInsets(
   raw: RawPptxDocument,
@@ -14,36 +10,31 @@ export async function enrichTextBodyInsets(
     return raw
   }
 
-  const canParseXmlDom = typeof DOMParser !== 'undefined'
-  const zip = await JSZip.loadAsync(input)
-  await correctEmbeddedMediaMimeTypes(raw, zip)
+  await JSZip.loadAsync(input)
 
-  await Promise.all(
-    raw.slides.map(async (slide, slideIndex) => {
-      const slideXml = await zip.file(`ppt/slides/slide${slideIndex + 1}.xml`)?.async('string')
+  for (const slide of raw.slides) {
+    const slideElements = [
+      ...(Array.isArray(slide.layoutElements) ? slide.layoutElements : []),
+      ...(Array.isArray(slide.elements) ? slide.elements : []),
+    ]
 
-      if (!slideXml) {
-        return
-      }
-
-      const slideTransition = extractSlideTransitionMetadata(slideXml)
-      const slideAnimations = extractSlideAnimationMetadata(slideXml)
-      const slideElements = [
-        ...(Array.isArray(slide.layoutElements) ? slide.layoutElements : []),
-        ...(Array.isArray(slide.elements) ? slide.elements : []),
-      ]
-
-      if (canParseXmlDom) {
-        const textBodyInsets = extractSlideTextBodyInsets(slideXml)
-        const lineMarkers = extractSlideLineMarkers(slideXml)
-        applyTextBodyInsets(slideElements, textBodyInsets)
-        applyLineMarkers(slideElements, lineMarkers)
-      }
-
-      applySlideTransitionMetadata(slide, slideTransition)
-      applySlideAnimationMetadata(slide, slideAnimations)
-    }),
-  )
+    applyVendorBulletMarkers(slideElements)
+  }
 
   return raw
+}
+
+function applyVendorBulletMarkers(elements: Array<Record<string, unknown>>) {
+  for (const element of elements) {
+    const children = Array.isArray(element.elements) ? (element.elements as Array<Record<string, unknown>>) : undefined
+    if (children) {
+      applyVendorBulletMarkers(children)
+    }
+
+    if (!Array.isArray(element.bulletMarkers)) {
+      continue
+    }
+
+    applyCustomBulletMarkers(element, element.bulletMarkers)
+  }
 }

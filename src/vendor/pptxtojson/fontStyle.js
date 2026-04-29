@@ -234,6 +234,42 @@ export function getFontSubscript(node, pNode, textBodyNode, slideLayoutSpNode, s
   return parseInt(baseline) > 0 ? 'super' : 'sub'
 }
 
+export function getFontHighlight(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, warpObj) {
+  const styleNodes = getFontStyleNodes(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
+
+  for (const styleNode of styleNodes) {
+    const highlightNode = styleNode ? styleNode['a:highlight'] : undefined
+    const color = getColorFromNode({ 'a:solidFill': highlightNode }, warpObj)
+    if (color) return color
+  }
+
+  return ''
+}
+
+export function getFontCaps(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl) {
+  const styleNodes = getFontStyleNodes(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
+  const caps = getFontAttr(styleNodes, 'cap')
+  if (caps === 'all') return 'uppercase'
+  if (caps === 'small') return 'small-caps'
+  return ''
+}
+
+export function getFontLanguage(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl) {
+  const styleNodes = getFontStyleNodes(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
+  return getFontAttr(styleNodes, 'lang') || ''
+}
+
+export function getFontScript(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl) {
+  const styleNodes = getFontStyleNodes(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
+  return getFontAttr(styleNodes, 'altLang') || ''
+}
+
+export function getFontKerning(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl) {
+  const styleNodes = getFontStyleNodes(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
+  const kern = getFontAttr(styleNodes, 'kern')
+  return (kern && parseInt(kern) !== 0) ? (parseInt(kern) / 100 + 'pt') : ''
+}
+
 export function getFontShadow(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, warpObj) {
   const styleNodes = getFontStyleNodes(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
   const shadow = getTextShadowFromStyleNodes(styleNodes, warpObj)

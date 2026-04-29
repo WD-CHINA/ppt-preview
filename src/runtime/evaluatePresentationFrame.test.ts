@@ -177,7 +177,7 @@ describe('evaluatePresentationFrame media output', () => {
         },
         {
           ...slide('slide-2', []),
-          transition: { type: 'push', direction: 'r', durationMs: 800 },
+          transition: { type: 'split', direction: 'in', orientation: 'horz', durationMs: 800 },
         },
       ],
     }
@@ -192,7 +192,8 @@ describe('evaluatePresentationFrame media output', () => {
     })
 
     expect(frame.currentSlideIndex).toBe(1)
-    expect(frame.transitionType).toBe('push')
-    expect(frame.transitionDirection).toBe('r')
+    expect(frame.transitionType).toBe('split')
+    expect(frame.transitionDirection).toBe('in')
+    expect(frame.transitionOrientation).toBe('horz')
   })
 })
