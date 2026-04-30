@@ -11,9 +11,12 @@ importers:
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
-      pptxtojson:
-        specifier: ^2.0.2
-        version: 2.0.2
+      tinycolor2:
+        specifier: 1.6.0
+        version: 1.6.0
+      txml:
+        specifier: ^5.1.1
+        version: 5.2.1
       vue:
         specifier: ^3.5.25
         version: 3.5.33(typescript@5.9.3)
@@ -566,9 +569,6 @@ packages:
   postcss@8.5.10:
     resolution: {integrity: sha512-pMMHxBOZKFU6HgAZ4eyGnwXF/EvPGGqUr0MnZ5+99485wwW41kW91A4LOGxSHhgugZmSChL5AlElNdwlNgcnLQ==}
     engines: {node: ^10 || ^12 || >=14}
-
-  pptxtojson@2.0.2:
-    resolution: {integrity: sha512-WOczc85a0doZ1V1hKetaclXixaGn8P7t2ZIVnPjBBwJX85ZKqRKjciTXC3Guxgaw61aFDIWjB3tb9TrUsjMnTA==}
 
   process-nextick-args@2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
@@ -1168,12 +1168,6 @@ snapshots:
       nanoid: 3.3.11
       picocolors: 1.1.1
       source-map-js: 1.2.1
-
-  pptxtojson@2.0.2:
-    dependencies:
-      jszip: 3.10.1
-      tinycolor2: 1.6.0
-      txml: 5.2.1
 
   process-nextick-args@2.0.1: {}
 
