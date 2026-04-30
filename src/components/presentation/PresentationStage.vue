@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue'
 import SlideViewport from './SlideViewport.vue'
 import { getStageViewportDescriptors } from './stageViewportModel'
+import { getTransitionViewportStyle } from './transitionViewportModel'
 import type { TouchInputDescriptor } from '../../runtime/input/inputEngine'
 import type { PresentationFrame } from '../../types/presentation'
 
@@ -34,6 +35,43 @@ const canvasStyle = computed(() => {
 })
 
 const viewportDescriptors = computed(() => getStageViewportDescriptors(props.frame))
+const showTransitionDebug = computed(() => {
+  if (!import.meta.env.DEV || typeof window === 'undefined') {
+    return false
+  }
+
+  const params = new URLSearchParams(window.location.search)
+  return params.has('transitionCase') || params.get('debugTransition') === '1'
+})
+
+const transitionDebugText = computed(() => {
+  if (!showTransitionDebug.value) {
+    return ''
+  }
+
+  return JSON.stringify({
+    frame: {
+      currentSlideIndex: props.frame.currentSlideIndex,
+      isTransitioning: props.frame.isTransitioning,
+      transitionType: props.frame.transitionType,
+      transitionDirection: props.frame.transitionDirection,
+      transitionOrientation: props.frame.transitionOrientation,
+      transitionProgress: props.frame.transitionProgress,
+    },
+    viewports: viewportDescriptors.value.map((descriptor) => ({
+      role: descriptor.transitionRole ?? 'current',
+      style: getTransitionViewportStyle({
+        transitionType: descriptor.transitionType,
+        transitionDirection: descriptor.transitionDirection,
+        transitionOrientation: descriptor.transitionOrientation,
+        role: descriptor.transitionRole,
+        progress: descriptor.transitionProgress,
+        width: props.frame.width,
+        height: props.frame.height,
+      }),
+    })),
+  }, null, 2)
+})
 
 function handleMouseUp(event: MouseEvent) {
   emit('stageClick', event)
@@ -107,6 +145,7 @@ onBeforeUnmount(() => {
         />
       </div>
     </div>
+    <pre v-if="showTransitionDebug" class="stage-debug">{{ transitionDebugText }}</pre>
   </div>
 </template>
 
@@ -134,5 +173,17 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0 auto auto 0;
   transform-origin: top left;
+}
+
+.stage-debug {
+  margin: 1rem 0 0;
+  padding: 0.85rem 1rem;
+  overflow: auto;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.84);
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 </style>

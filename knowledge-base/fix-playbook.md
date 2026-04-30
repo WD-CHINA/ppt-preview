@@ -502,13 +502,15 @@ pnpm build
   - `cover`：current viewport 盖住 previous viewport，previous 继续停留在原位
   - `uncover`：previous viewport 移开，current 维持静止
   - `wipe`：current viewport 用 `clip-path` 逐步揭示
-  - `split`：先保留为中性占位，等待专门 renderer
-  - `zoom`：先做最小 scale + crossfade fallback，避免继续误掉回普通 `fade`
+  - `split`：当前已补第一版 orientation-aware clip-path 几何。`orient="vert"` 走上下 center/outer band，`orient="horz"` 走左右 center/outer band；`dir="in/out"` 决定 current/previous 哪一层显示中心带、哪一层显示外围带
+  - `zoom`：当前已升级为更强的 eased reciprocal zoom。current 从更小比例更快贴近，previous 做更明显但仍受控的放大退出，并保留 crossfade；这样比线性 `scale(...)` 更接近真实转场的前后景层次
 - `random` 目前先以 `random` 作为语义标记保留，parser 侧已可识别 custom duration，renderer 侧把它收敛为中性 crossfade fallback（current/previous 仅做 opacity 互补，不额外加 fade 的 translate/scale）；但 `random` 本身仍是 open case（未知具体视觉效果）
 - 后续补 `push`/`wipe` 方向时，不要只在 helper 里硬编码；要把 `direction` 从 slide XML 一路带到 runtime frame：`slide-transitions.ts -> RawPptxSlide.transition.direction -> normalizePresentation -> evaluatePresentationFrame -> stageViewportModel -> SlideViewport`
 - `push` 当前已支持 `r/l/u/d` 四向 previous/current 位移；`wipe` 当前已支持 `r/l/u/d` 四向 clip-path 揭示，先锁纯函数测试，再做真实页视觉回归
 - 真实样本要区分两件事：`47e66b31f89d4b33b14c5010b92296c5.pptx` 已能验证 `push dir="u"`；`wipe` 则建议直接从现有小 deck 派生一个真实 fixture（如把 `演示文稿1.pptx` 的前四页 transition 改成 `wipe dir="r/l/u/d"`），再用浏览器逐页卡 mid-transition 检查 `frame.transitionDirection` 与 `.viewport` 的 `clipPath` 是否一致。这样可以把“纯函数四向测试”补成“真实 PPTX 四向回归”
 - 为了避免每次都手写一大段 `browser_console` 表达式，建议把这套流程沉淀成 repo 内可复用 harness（如 `public/transition-regression-harness.js`），并把固定 case 与预期结果记入 `fixtures/transition-regression-cases.md`。后续只要换 fixture / sourceSlideIndex / tickMs，就能重复收集 `frame + viewport styles` 证据。
+- 对于本地开发页，优先补一个 dev-only fixture loader，而不是把浏览器回归完全绑死在隐藏 `input[type=file]` 上。当前 runtime 已支持 `?fixture=<public-file-name>` 自动加载，并在浏览器上下文暴露 `window.__pptPreviewLoadFixture(fileName)`，供 `transition-regression-harness.js` 直接复用。
+- 如果浏览器回归需要稳定卡住某个 mid-transition case，不要每次都在 console 里手写 `runtime.pause() / state.activeSlideIndex / nextSlide() / tick(...)`。更稳的做法是把 case catalog 提升为页面内 helper：当前 runtime 已支持 `?transitionCase=<caseId>` 自动加载并冻结到目标中间态，同时暴露 `window.__pptPreviewPrepareTransitionCase(caseId)` 供 harness 复用。
 - 如果暂时还没有像素级截图对照，也先不要空着。至少落一份结构化 baseline（如 `fixtures/transition-regression-baseline.json`），把 `frame.transitionType / transitionDirection / transitionProgress` 与 viewport 的 `clipPath / transform / opacity` 固定下来；这样后续任何改动都能先做行为级 diff，再决定是否需要重新采集视觉基线。
 - 若主人要求“直接拿本机 WPS 做对照”，在 macOS 权限已开的前提下，可走一条真实链路：`osascript` 负责激活 WPS/触发放映与翻页，`screencapture -l <windowId>` 负责编辑态窗口截图，`ffmpeg -f avfoundation -i '1:none'` 负责录制放映中的全屏帧。对比时不要只信 `browser_vision` 主观判断，必须同时记录：
   - WPS 录屏帧路径（如 `/tmp/wps-compare/video/...`）

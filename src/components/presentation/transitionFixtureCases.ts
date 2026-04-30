@@ -6,7 +6,10 @@ export interface TransitionFixtureCase {
   caseId: string
   sourceSlideIndex: number
   tickMs: number
-  expectedFrame: Pick<PresentationFrame, 'currentSlideIndex' | 'isTransitioning' | 'transitionType' | 'transitionDirection'>
+  expectedFrame: Pick<
+    PresentationFrame,
+    'currentSlideIndex' | 'isTransitioning' | 'transitionType' | 'transitionDirection' | 'transitionOrientation'
+  >
   expectedViewports: Array<{
     role: 'previous' | 'current'
     style: Record<string, string | number>
@@ -31,6 +34,7 @@ export const transitionFixtureCases: TransitionFixtureCase[] = [
       isTransitioning: true,
       transitionType: 'cover',
       transitionDirection: 'r',
+      transitionOrientation: undefined,
     },
     expectedViewports: [
       {
@@ -60,6 +64,7 @@ export const transitionFixtureCases: TransitionFixtureCase[] = [
       isTransitioning: true,
       transitionType: 'uncover',
       transitionDirection: 'l',
+      transitionOrientation: undefined,
     },
     expectedViewports: [
       {
@@ -89,13 +94,14 @@ export const transitionFixtureCases: TransitionFixtureCase[] = [
       isTransitioning: true,
       transitionType: 'zoom',
       transitionDirection: undefined,
+      transitionOrientation: undefined,
     },
     expectedViewports: [
       {
         role: 'previous',
         style: {
           opacity: 0.5,
-          transform: 'scale(1.06)',
+          transform: 'scale(1.14)',
           transition: 'none',
         },
       },
@@ -103,7 +109,7 @@ export const transitionFixtureCases: TransitionFixtureCase[] = [
         role: 'current',
         style: {
           opacity: 0.5,
-          transform: 'scale(0.94)',
+          transform: 'scale(0.96)',
           transition: 'none',
         },
       },
@@ -118,13 +124,15 @@ export const transitionFixtureCases: TransitionFixtureCase[] = [
       isTransitioning: true,
       transitionType: 'split',
       transitionDirection: 'out',
+      transitionOrientation: 'vert',
     },
     expectedViewports: [
       {
         role: 'previous',
         style: {
           opacity: 1,
-          transform: 'scaleY(0.5)',
+          clipPath: 'polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 0 25%, 100% 25%, 100% 75%, 0 75%, 0 25%)',
+          transform: 'none',
           transition: 'none',
         },
       },
@@ -132,7 +140,8 @@ export const transitionFixtureCases: TransitionFixtureCase[] = [
         role: 'current',
         style: {
           opacity: 1,
-          transform: 'scaleY(0.5)',
+          clipPath: 'inset(25% 0 25% 0)',
+          transform: 'none',
           transition: 'none',
         },
       },

@@ -312,12 +312,12 @@
 - 当前进展：
   - `transitionViewportModel.ts` 已把 `cover / uncover / split / zoom` 接入 typed dispatch
   - 其中 `cover` / `uncover` 用最小方向性移动占位
-  - `zoom` 已补最小 scale + crossfade fallback，至少不再掉回普通 `fade`
-  - `split` 仍先保留为中性占位
+  - `zoom` 已从线性 scale + crossfade fallback 提升到更强的 eased reciprocal zoom，至少不再掉回普通 `fade`，并且 current/previous 的层次更明确
+  - `split` 已补第一版 orientation-aware clip-path 几何：当前按 `orient=vert/horz` 切 center/outer band，并按 `dir=in/out` 切换 current/previous 的 reveal/collapse
   - 已新增真实样本 `transition-cover-uncover-zoom-split-fixture.pptx`，并用 `src/components/presentation/transitionFixtureRegression.test.ts` 锁住 `pptx -> parse -> normalize -> runtime -> viewport style` 链路
 - 仍未覆盖：
   - 真实页 WPS / PowerPoint 中间态对照
-  - `split` 的 renderer 语义
+  - `split` 与 Office / WPS 的更高保真 clip/mask 几何、easing 和边界细节
   - 更完整的 mask / 方向 / easing 细节
 - 关键做法：
   - 先把未知转场从 `fade` 里分出来，避免语义污染

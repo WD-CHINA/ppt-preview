@@ -1,4 +1,10 @@
 export async function loadPptxFixture(fileName) {
+  if (typeof window.__pptPreviewLoadFixture === 'function') {
+    await window.__pptPreviewLoadFixture(fileName)
+    await sleep(250)
+    return
+  }
+
   const response = await fetch(`http://localhost:5173/${encodeURIComponent(fileName)}`)
   const blob = await response.blob()
   const file = new File([blob], fileName, {
@@ -33,32 +39,40 @@ export const defaultTransitionRegressionCases = [
 export async function collectTransitionRegressionCase(caseConfig) {
   await loadPptxFixture(caseConfig.fileName)
 
-  const component = getShellComponent()
-  const runtime = component.props.runtime
-  runtime.pause()
-
-  if (caseConfig.prepareMode === 'goToSlide') {
-    runtime.goToSlide(caseConfig.sourceSlideIndex)
+  if (typeof window.__pptPreviewPrepareTransitionCase === 'function' && caseConfig.caseId) {
+    await window.__pptPreviewPrepareTransitionCase(caseConfig.caseId)
     await nextFrame()
-  } else {
-    const state = runtime.state
-    state.activeSlideIndex = caseConfig.sourceSlideIndex
-    state.timelinePositionMs = 0
-    state.slideElapsedMs = 0
-    state.currentTriggerIndex = 0
-    state.waitingTrigger = false
-    state.transitionFromSlideIndex = null
-    state.transitionToSlideIndex = null
-    state.transitionProgress = 1
-    state.sessionStatus = 'paused'
+    await nextFrame()
+  }
+  else {
+    const component = getShellComponent()
+    const runtime = component.props.runtime
+    runtime.pause()
+
+    if (caseConfig.prepareMode === 'goToSlide') {
+      runtime.goToSlide(caseConfig.sourceSlideIndex)
+      await nextFrame()
+    } else {
+      const state = runtime.state
+      state.activeSlideIndex = caseConfig.sourceSlideIndex
+      state.timelinePositionMs = 0
+      state.slideElapsedMs = 0
+      state.currentTriggerIndex = 0
+      state.waitingTrigger = false
+      state.transitionFromSlideIndex = null
+      state.transitionToSlideIndex = null
+      state.transitionProgress = 1
+      state.sessionStatus = 'paused'
+      await nextFrame()
+    }
+
+    runtime.nextSlide()
+    runtime.tick(caseConfig.tickMs ?? 400)
+    await nextFrame()
     await nextFrame()
   }
 
-  runtime.nextSlide()
-  runtime.tick(caseConfig.tickMs ?? 400)
-  await nextFrame()
-  await nextFrame()
-
+  const component = getShellComponent()
   const frame = component.props.frame
   return {
     caseId: caseConfig.caseId,
@@ -69,6 +83,7 @@ export async function collectTransitionRegressionCase(caseConfig) {
       isTransitioning: frame.isTransitioning,
       transitionType: frame.transitionType,
       transitionDirection: frame.transitionDirection,
+      transitionOrientation: frame.transitionOrientation,
       transitionProgress: round(frame.transitionProgress),
       previousSlideId: frame.previous?.slideId,
       currentSlideId: frame.current?.slideId,

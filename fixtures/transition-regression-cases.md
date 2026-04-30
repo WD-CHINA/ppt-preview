@@ -10,6 +10,20 @@
 
 1. 启动 dev server：`pnpm dev --host 0.0.0.0`
 2. 打开 `http://localhost:5173/`
+   也可以直接带 fixture query，例如：
+
+```text
+http://localhost:5173/?fixture=transition-cover-uncover-zoom-split-fixture.pptx
+```
+
+   当前 dev runtime 已支持 `?fixture=` 自动加载 public 下的真实样本，适合先肉眼确认页面内容是否正确。
+   如果想直接冻结到某个中间态 case，也可以直接打开：
+
+```text
+http://localhost:5173/?transitionCase=split-vert-out-real
+```
+
+   当前 dev runtime 会自动匹配对应 fixture、推进到指定 source slide，并在 `tickMs` 后暂停到该 case 的 mid-transition 状态。
 3. 在浏览器 console 或 `browser_console` 中加载 harness：
 
 ```js
@@ -34,6 +48,13 @@ await harness.runTransitionRegressionSuite([
 ```
 
 5. 如果只是校验当前实现有没有回退，优先对照 [`transition-regression-baseline.json`](./transition-regression-baseline.json) 里的 `frame/viewports` 结构化结果；等后续接入自动截图后，再叠加像素级对照。
+
+补充说明：
+
+- `public/transition-regression-harness.js` 现在会优先调用 `window.__pptPreviewLoadFixture(fileName)`；只有拿不到这个 dev loader 时，才回退到隐藏 `input[type=file]` 注入。
+- 如果页面已暴露 `window.__pptPreviewPrepareTransitionCase(caseId)`，harness 也会优先复用它来卡住目标 case，避免页面内和 harness 各自维护一套 prepare 逻辑。
+- 这样 in-app browser、本地浏览器和 console 手工复验都不再强依赖文件选择器能力。
+- 批量冻结态截图可通过 [captureTransitionVisualBaselines.mjs](/Applications/work/ppt-preview/fixtures/visual-baselines/captureTransitionVisualBaselines.mjs) 复采，最近一次产物清单见 [transition-visual-baselines.json](/Applications/work/ppt-preview/fixtures/visual-baselines/transition-visual-baselines.json)。
 
 ## 维护原则
 
@@ -155,12 +176,16 @@ await harness.runTransitionRegressionSuite([
 - 预期：
   - `frame.transitionType = "cover"`
   - `frame.transitionDirection = "r"`
+  - `frame.transitionOrientation` 为空
   - previous/current 共 2 个 viewport
   - previous 保持原位，current 自右向左覆盖进入
 - 已记录样本值：
   - `transitionProgress = 0.5`
   - previous：`transform = none`
   - current：`transform = translateX(640px)`
+- 浏览器冻结帧：
+  - [cover-right-real-browser.png](/Applications/work/ppt-preview/fixtures/visual-baselines/cover-right-real-browser.png)
+  - 采集方式：打开 `http://localhost:5173/?transitionCase=cover-right-real`，确认页面状态为 `paused` 后截取浏览器当前帧
 
 ### 11. `uncover-left-real`
 - 文件：`transition-cover-uncover-zoom-split-fixture.pptx`
@@ -168,12 +193,16 @@ await harness.runTransitionRegressionSuite([
 - 预期：
   - `frame.transitionType = "uncover"`
   - `frame.transitionDirection = "l"`
+  - `frame.transitionOrientation` 为空
   - previous/current 共 2 个 viewport
   - current 保持原位，previous 向右退出
 - 已记录样本值：
   - `transitionProgress = 0.5`
   - previous：`transform = translateX(640px)`
   - current：`transform = none`
+- 浏览器冻结帧：
+  - [uncover-left-real-browser.png](/Applications/work/ppt-preview/fixtures/visual-baselines/uncover-left-real-browser.png)
+  - 采集方式：打开 `http://localhost:5173/?transitionCase=uncover-left-real`，确认页面状态为 `paused` 后截取浏览器当前帧
 - 备注：
   - slide XML 实际标签是 `<p:pull dir="l"/>`；parser/runtime 侧应映射成 `uncover`
 
@@ -182,12 +211,16 @@ await harness.runTransitionRegressionSuite([
 - 路径：`slide3 -> slide4`
 - 预期：
   - `frame.transitionType = "zoom"`
+  - `frame.transitionOrientation` 为空
   - previous/current 共 2 个 viewport
-  - 当前实现先用 scale + crossfade fallback，后续再和 Office/WPS 对照细化
+  - 当前实现已升级为更强的 eased reciprocal zoom：current 从更小比例更快贴近，previous 做更明显但仍受控的放大退出，并保留 crossfade
 - 已记录样本值：
   - `transitionProgress = 0.5`
-  - previous：`opacity = 0.5`，`transform = scale(1.06)`
-  - current：`opacity = 0.5`，`transform = scale(0.94)`
+  - previous：`opacity = 0.5`，`transform = scale(1.14)`
+  - current：`opacity = 0.5`，`transform = scale(0.96)`
+- 浏览器冻结帧：
+  - [zoom-default-real-browser.png](/Applications/work/ppt-preview/fixtures/visual-baselines/zoom-default-real-browser.png)
+  - 采集方式：打开 `http://localhost:5173/?transitionCase=zoom-default-real`，确认页面状态为 `paused` 后截取浏览器当前帧
 
 ### 13. `split-vert-out-real`
 - 文件：`transition-cover-uncover-zoom-split-fixture.pptx`
@@ -195,12 +228,17 @@ await harness.runTransitionRegressionSuite([
 - 预期：
   - `frame.transitionType = "split"`
   - `frame.transitionDirection = "out"`
-  - 当前 renderer 仍为中性占位，但 parser 应能稳定读到 type/direction
+  - `frame.transitionOrientation = "vert"`
+  - 当前 renderer 已按 orientation 输出 center/outer 互补 `clip-path` 几何
 - 已记录样本值：
   - `transitionProgress = 0.5`
-  - previous/current：`transform = none`
+  - previous：`clipPath = polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 0 25%, 100% 25%, 100% 75%, 0 75%, 0 25%)`
+  - current：`clipPath = inset(25% 0 25% 0)`
+- 浏览器冻结帧：
+  - [split-vert-out-real-browser.png](/Applications/work/ppt-preview/fixtures/visual-baselines/split-vert-out-real-browser.png)
+  - 采集方式：打开 `http://localhost:5173/?transitionCase=split-vert-out-real`，确认页面状态为 `paused` 后截取浏览器当前帧
 - 备注：
-  - slide XML 还带 `orient="vert"`，当前 runtime 尚未消费这一路元数据
+  - slide XML 的 `orient="vert"` 已贯通到 `frame.transitionOrientation`
 
-- 还没有把这些 case 接入自动截图比对
+- 当前已把 `push / wipe / cover / uncover / zoom / split` 的浏览器冻结帧接入 repo 内采集脚本与 manifest，但还没有做像素 diff 级自动比对
 - 还没有和 Office / WPS 中间态做像素级对照

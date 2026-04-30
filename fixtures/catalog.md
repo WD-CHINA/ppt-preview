@@ -206,9 +206,14 @@
   - 已有真实 PPTX regression test：`src/components/presentation/transitionFixtureRegression.test.ts`
   - 后续可直接接入 `transition-regression-harness.js`，固化 `frame.transitionType / transitionDirection / viewport transform / opacity`
   - 为 `zoom / cover / uncover / split` 从“纯函数 fallback”推进到“真实 PPTX 回归”提供固定输入
+  - 已开始沉淀冻结态视觉基线，例如：
+    [cover-right-real-browser.png](/Applications/work/ppt-preview/fixtures/visual-baselines/cover-right-real-browser.png)、
+    [uncover-left-real-browser.png](/Applications/work/ppt-preview/fixtures/visual-baselines/uncover-left-real-browser.png)、
+    [zoom-default-real-browser.png](/Applications/work/ppt-preview/fixtures/visual-baselines/zoom-default-real-browser.png)、
+    [split-vert-out-real-browser.png](/Applications/work/ppt-preview/fixtures/visual-baselines/split-vert-out-real-browser.png)
 - 边界：
-  - 目前还没有把这份 fixture 的中间态写入结构化 baseline
-  - `split` renderer 仍是中性占位，真实几何语义还没实现
+  - 目前还没有把这份 fixture 的中间态接入自动截图比对
+  - `zoom` 已升级到更强的 eased reciprocal scaling、`split` 已有第一版 center/outer `clip-path` 几何，但整体仍不是 Office/WPS 的高保真 mask/clip/easing 语义
 
 标签：
 

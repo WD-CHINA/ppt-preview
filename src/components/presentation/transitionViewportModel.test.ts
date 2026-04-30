@@ -80,37 +80,41 @@ describe('transitionViewportModel', () => {
     })
   })
 
-  it('renders vertical split-out transitions as a scale-based reveal/collapse pair', () => {
+  it('renders vertical split-out transitions as complementary center-band clip paths', () => {
     expect(getTransitionViewportStyle({ transitionType: 'split', transitionOrientation: 'vert', transitionDirection: 'out', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
       opacity: 1,
-      transform: 'scaleY(0.75)',
+      transform: 'none',
+      clipPath: 'inset(37.5% 0 37.5% 0)',
       transition: 'none',
     })
     expect(getTransitionViewportStyle({ transitionType: 'split', transitionOrientation: 'vert', transitionDirection: 'out', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
       opacity: 1,
-      transform: 'scaleY(0.25)',
+      transform: 'none',
+      clipPath: 'polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 0 37.5%, 100% 37.5%, 100% 62.5%, 0 62.5%, 0 37.5%)',
       transition: 'none',
     })
   })
 
-  it('supports horizontal split-in transitions', () => {
+  it('supports horizontal split-in transitions with inverse edge geometry', () => {
     expect(getTransitionViewportStyle({ transitionType: 'split', transitionOrientation: 'horz', transitionDirection: 'in', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
-      transform: 'scaleX(0.25)',
+      transform: 'none',
+      clipPath: 'polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 12.5% 0, 12.5% 100%, 87.5% 100%, 87.5% 0, 12.5% 0)',
     })
     expect(getTransitionViewportStyle({ transitionType: 'split', transitionOrientation: 'horz', transitionDirection: 'in', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
-      transform: 'scaleX(0.75)',
+      transform: 'none',
+      clipPath: 'inset(0 12.5% 0 12.5%)',
     })
   })
 
-  it('renders zoom transitions as a scale-based crossfade fallback', () => {
+  it('renders zoom transitions as a stronger foreground/background zoom pair', () => {
     expect(getTransitionViewportStyle({ transitionType: 'zoom', role: 'current', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
       opacity: 0.25,
-      transform: 'scale(0.91)',
+      transform: 'scale(0.865)',
       transition: 'none',
     })
     expect(getTransitionViewportStyle({ transitionType: 'zoom', role: 'previous', progress: 0.25, width: 1280, height: 720 })).toMatchObject({
       opacity: 0.75,
-      transform: 'scale(1.03)',
+      transform: 'scale(1.093)',
       transition: 'none',
     })
   })

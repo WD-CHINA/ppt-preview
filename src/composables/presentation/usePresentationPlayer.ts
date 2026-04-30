@@ -1,6 +1,7 @@
-import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 import { parseWithPptxtojson } from '../../adapters/pptxtojson/parseWithPptxtojson'
 import { normalizePresentation } from '../../adapters/pptxtojson/normalizePresentation'
+import { findTransitionDebugCase, transitionDebugCases, type TransitionDebugCase } from '../../fixtures/transitionCaseCatalog'
 import { evaluatePresentationFrame } from '../../runtime/evaluatePresentationFrame'
 import { createPresentationRuntime } from '../../runtime/createPresentationRuntime'
 import type { NormalizedPresentation } from '../../types/presentation'
@@ -158,13 +159,105 @@ export function usePresentationPlayer() {
     }
   }
 
+  async function loadFixtureByName(fileName: string) {
+    if (!fileName) {
+      return
+    }
+
+    const response = await fetch(`/${encodeURIComponent(fileName)}`)
+
+    if (!response.ok) {
+      throw new Error(`无法加载 fixture: ${fileName}`)
+    }
+
+    const blob = await response.blob()
+    const file = new File([blob], fileName, {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    })
+
+    await loadFile(file)
+    await nextTick()
+  }
+
+  async function prepareTransitionCase(caseConfig: TransitionDebugCase) {
+    const activeRuntime = runtime.value
+    activeRuntime.pause()
+
+    if (caseConfig.prepareMode === 'goToSlide') {
+      activeRuntime.goToSlide(caseConfig.sourceSlideIndex)
+      await nextTick()
+    } else {
+      const state = activeRuntime.state
+      state.activeSlideIndex = caseConfig.sourceSlideIndex
+      state.timelinePositionMs = 0
+      state.slideElapsedMs = 0
+      state.currentTriggerIndex = 0
+      state.waitingTrigger = false
+      state.transitionFromSlideIndex = null
+      state.transitionToSlideIndex = null
+      state.transitionProgress = 1
+      state.sessionStatus = 'paused'
+      await nextTick()
+    }
+
+    activeRuntime.nextSlide()
+    activeRuntime.tick(caseConfig.tickMs)
+    activeRuntime.pause()
+    await nextTick()
+  }
+
+  async function prepareTransitionCaseById(caseId: string) {
+    const caseConfig = findTransitionDebugCase(caseId)
+
+    if (!caseConfig) {
+      throw new Error(`未知 transition case: ${caseId}`)
+    }
+
+    if (lastFileName.value !== caseConfig.fileName) {
+      await loadFixtureByName(caseConfig.fileName)
+    }
+
+    await prepareTransitionCase(caseConfig)
+  }
+
+  async function loadFixtureFromLocation() {
+    const params = new URLSearchParams(window.location.search)
+    const transitionCaseId = params.get('transitionCase') ?? params.get('caseId')
+    const transitionCase = transitionCaseId ? findTransitionDebugCase(transitionCaseId) : undefined
+    const fixtureName = params.get('fixture') ?? transitionCase?.fileName
+
+    if (!fixtureName && !transitionCase) {
+      return
+    }
+
+    try {
+      if (fixtureName) {
+        await loadFixtureByName(fixtureName)
+      }
+
+      if (transitionCase) {
+        await prepareTransitionCase(transitionCase)
+      }
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : 'Fixture 加载失败'
+      error.value = message
+    }
+  }
+
   onMounted(() => {
     startLoop()
+    window.__pptPreviewLoadFixture = loadFixtureByName
+    window.__pptPreviewPrepareTransitionCase = prepareTransitionCaseById
+    window.__pptPreviewTransitionCases = transitionDebugCases
+    void loadFixtureFromLocation()
   })
 
   onBeforeUnmount(() => {
     stopLoop()
     runtime.value.dispose()
+    delete window.__pptPreviewLoadFixture
+    delete window.__pptPreviewPrepareTransitionCase
+    delete window.__pptPreviewTransitionCases
   })
 
   return {

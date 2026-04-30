@@ -11,30 +11,32 @@ export interface BulletMarker {
 }
 
 export function readBulletMarkers(shapeNode: Element): BulletMarker[] {
-  return Array.from(shapeNode.getElementsByTagName('a:p'))
-    .map((paragraphNode) => {
-      const paragraphProperties = paragraphNode.getElementsByTagName('a:pPr')[0]
-      const char = paragraphNode.getElementsByTagName('a:buChar')[0]?.getAttribute('char')
-      const autoNumber = paragraphNode.getElementsByTagName('a:buAutoNum')[0]
+  const markers: BulletMarker[] = []
 
-      if (!char && !autoNumber) {
-        return undefined
-      }
+  for (const paragraphNode of Array.from(shapeNode.getElementsByTagName('a:p'))) {
+    const paragraphProperties = paragraphNode.getElementsByTagName('a:pPr')[0]
+    const char = paragraphNode.getElementsByTagName('a:buChar')[0]?.getAttribute('char')
+    const autoNumber = paragraphNode.getElementsByTagName('a:buAutoNum')[0]
 
-      const marginLeft = emuToPoints(paragraphProperties?.getAttribute('marL'))
-      const indent = emuToPoints(paragraphProperties?.getAttribute('indent'))
+    if (!char && !autoNumber) {
+      continue
+    }
 
-      return {
-        char: char ?? '',
-        fontFace: paragraphNode.getElementsByTagName('a:buFont')[0]?.getAttribute('typeface') ?? undefined,
-        level: normalizeNumber(paragraphProperties?.getAttribute('lvl')) ?? 0,
-        marginLeft,
-        indent,
-        hanging: computeHangingIndent(marginLeft, indent),
-        listType: autoNumber ? 'ol' : 'ul',
-      }
+    const marginLeft = emuToPoints(paragraphProperties?.getAttribute('marL'))
+    const indent = emuToPoints(paragraphProperties?.getAttribute('indent'))
+
+    markers.push({
+      char: char ?? '',
+      fontFace: paragraphNode.getElementsByTagName('a:buFont')[0]?.getAttribute('typeface') ?? undefined,
+      level: normalizeNumber(paragraphProperties?.getAttribute('lvl')) ?? 0,
+      marginLeft,
+      indent,
+      hanging: computeHangingIndent(marginLeft, indent),
+      listType: autoNumber ? 'ol' : 'ul',
     })
-    .filter((marker): marker is BulletMarker => marker !== undefined)
+  }
+
+  return markers
 }
 
 export function applyCustomBulletMarkers(

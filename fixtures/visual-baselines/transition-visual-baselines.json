@@ -1,0 +1,77 @@
+{
+  "generatedAt": "2026-04-30T10:56:39.000Z",
+  "baseUrl": "http://localhost:5173",
+  "waitMs": 800,
+  "captures": [
+    {
+      "caseId": "push-default-real",
+      "fileName": "push-default-real-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/push-default-real-browser.png",
+      "url": "http://localhost:5173/?transitionCase=push-default-real",
+      "bytes": 163126
+    },
+    {
+      "caseId": "push-up-real",
+      "fileName": "push-up-real-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/push-up-real-browser.png",
+      "url": "http://localhost:5173/?transitionCase=push-up-real",
+      "bytes": 148456
+    },
+    {
+      "caseId": "wipe-right-real",
+      "fileName": "wipe-right-real-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/wipe-right-real-browser.png",
+      "url": "http://localhost:5173/?transitionCase=wipe-right-real",
+      "bytes": 169164
+    },
+    {
+      "caseId": "wipe-left-real",
+      "fileName": "wipe-left-real-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/wipe-left-real-browser.png",
+      "url": "http://localhost:5173/?transitionCase=wipe-left-real",
+      "bytes": 163920
+    },
+    {
+      "caseId": "wipe-up-real",
+      "fileName": "wipe-up-real-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/wipe-up-real-browser.png",
+      "url": "http://localhost:5173/?transitionCase=wipe-up-real",
+      "bytes": 162678
+    },
+    {
+      "caseId": "wipe-down-real",
+      "fileName": "wipe-down-real-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/wipe-down-real-browser.png",
+      "url": "http://localhost:5173/?transitionCase=wipe-down-real",
+      "bytes": 165358
+    },
+    {
+      "caseId": "cover-right-real",
+      "fileName": "cover-right-real-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/cover-right-real-browser.png",
+      "url": "http://localhost:5173/?transitionCase=cover-right-real",
+      "bytes": 169014
+    },
+    {
+      "caseId": "uncover-left-real",
+      "fileName": "uncover-left-real-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/uncover-left-real-browser.png",
+      "url": "http://localhost:5173/?transitionCase=uncover-left-real",
+      "bytes": 162593
+    },
+    {
+      "caseId": "zoom-default-real",
+      "fileName": "zoom-default-real-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/zoom-default-real-browser.png",
+      "url": "http://localhost:5173/?transitionCase=zoom-default-real",
+      "bytes": 166078
+    },
+    {
+      "caseId": "split-vert-out-real",
+      "fileName": "split-vert-out-real-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/split-vert-out-real-browser.png",
+      "url": "http://localhost:5173/?transitionCase=split-vert-out-real",
+      "bytes": 164752
+    }
+  ]
+}

@@ -166,10 +166,10 @@ describe('vendor pptxtojson integration', () => {
         </p:bldLst>
       </p:sld>`)
 
-    const raw = await parse(input, { imageMode: 'both', videoMode: 'none', audioMode: 'none' })
+    const raw = await parse(input, { imageMode: 'both', videoMode: 'none', audioMode: 'none' }) as any
     const slide = raw.slides[0]
-    const title = slide.elements.find((element) => element.name === 'Title 1')
-    const image = slide.elements.find((element) => element.type === 'image')
+    const title = slide.elements.find((element: any) => element.name === 'Title 1')
+    const image = slide.elements.find((element: any) => element.type === 'image')
 
     expect(slide.transition).toMatchObject({
       type: 'uncover',
@@ -313,8 +313,8 @@ describe('vendor pptxtojson integration', () => {
     zip.file('ppt/tableStyles.xml', `<?xml version="1.0" encoding="UTF-8"?><a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="tableStyleId"/>`)
 
     const input = await zip.generateAsync({ type: 'arraybuffer' })
-    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' })
-    const body = raw.slides[0]?.elements.find((element) => element.name === 'Body 1')
+    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' }) as any
+    const body = raw.slides[0]?.elements.find((element: any) => element.name === 'Body 1')
 
     expect(body?.content).toContain('margin-left: 27pt;')
     expect(body?.content).toContain('text-indent: -13.5pt;')
@@ -381,8 +381,8 @@ describe('vendor pptxtojson integration', () => {
     zip.file('ppt/tableStyles.xml', `<?xml version="1.0" encoding="UTF-8"?><a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="tableStyleId"/>`)
 
     const input = await zip.generateAsync({ type: 'arraybuffer' })
-    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' })
-    const body = raw.slides[0]?.elements.find((element) => element.name === 'Default Paragraph Body')
+    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' }) as any
+    const body = raw.slides[0]?.elements.find((element: any) => element.name === 'Default Paragraph Body')
 
     expect(body?.content).toContain('direction: rtl;')
     expect(body?.content).toContain('--pptx-font-align: base;')
@@ -444,9 +444,9 @@ describe('vendor pptxtojson integration', () => {
         </p:cSld>
       </p:sld>`)
 
-    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' })
+    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' }) as any
     const slide = raw.slides[0]
-    const table = slide.elements.find((element) => element.type === 'table')
+    const table = slide.elements.find((element: any) => element.type === 'table')
     const cell = table?.data?.[0]?.[0]
 
     expect(table).toBeTruthy()
@@ -575,8 +575,8 @@ describe('vendor pptxtojson integration', () => {
       </a:tblStyleLst>`)
 
     const input = await zip.generateAsync({ type: 'arraybuffer' })
-    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' })
-    const table = raw.slides[0]?.elements.find((element) => element.type === 'table')
+    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' }) as any
+    const table = raw.slides[0]?.elements.find((element: any) => element.type === 'table')
     const northWestCell = table?.data?.[0]?.[0]
     const northEastCell = table?.data?.[0]?.[1]
 
@@ -735,8 +735,8 @@ describe('vendor pptxtojson integration', () => {
       </c:chartSpace>`)
 
     const input = await zip.generateAsync({ type: 'arraybuffer' })
-    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' })
-    const chart = raw.slides[0]?.elements.find((element) => element.type === 'chart')
+    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' }) as any
+    const chart = raw.slides[0]?.elements.find((element: any) => element.type === 'chart')
 
     expect(chart).toMatchObject({
       chartType: 'barChart',
@@ -967,8 +967,8 @@ describe('vendor pptxtojson integration', () => {
     zip.file('ppt/diagrams/_rels/drawing1.xml.rels', `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>`)
 
     const input = await zip.generateAsync({ type: 'arraybuffer' })
-    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' })
-    const diagram = raw.slides[0]?.elements.find((element) => element.type === 'diagram')
+    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' }) as any
+    const diagram = raw.slides[0]?.elements.find((element: any) => element.type === 'diagram')
 
     expect(diagram).toMatchObject({
       type: 'diagram',
@@ -1043,8 +1043,8 @@ describe('vendor pptxtojson integration', () => {
     zip.file('ppt/charts/chart1.xml', `<?xml version="1.0" encoding="UTF-8"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:plotArea><c:scatterChart><c:scatterStyle val="lineMarker"/><c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:strRef><c:strCache><c:pt idx="0"><c:v>Series XY</c:v></c:pt></c:strCache></c:strRef></c:tx><c:xVal><c:numRef><c:numCache><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt></c:numCache></c:numRef></c:xVal><c:yVal><c:numRef><c:numCache><c:pt idx="0"><c:v>10</c:v></c:pt><c:pt idx="1"><c:v>20</c:v></c:pt></c:numCache></c:numRef></c:yVal><c:spPr><a:solidFill><a:srgbClr val="3366CC"/></a:solidFill></c:spPr></c:ser></c:scatterChart></c:plotArea></c:chart></c:chartSpace>`)
 
     const input = await zip.generateAsync({ type: 'arraybuffer' })
-    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' })
-    const chart = raw.slides[0]?.elements.find((element) => element.type === 'chart')
+    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' }) as any
+    const chart = raw.slides[0]?.elements.find((element: any) => element.type === 'chart')
 
     expect(chart).toMatchObject({
       chartType: 'scatterChart',
@@ -1093,8 +1093,8 @@ describe('vendor pptxtojson integration', () => {
     zip.file('ppt/charts/chart1.xml', `<?xml version="1.0" encoding="UTF-8"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:plotArea><c:pieChart><c:varyColors val="1"/><c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:strRef><c:strCache><c:pt idx="0"><c:v>Share</c:v></c:pt></c:strCache></c:strRef></c:tx><c:cat><c:strRef><c:strCache><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt></c:strCache></c:strRef></c:cat><c:val><c:numRef><c:numCache><c:pt idx="0"><c:v>60</c:v></c:pt><c:pt idx="1"><c:v>40</c:v></c:pt></c:numCache></c:numRef></c:val><c:dPt><c:idx val="0"/><c:spPr><a:solidFill><a:srgbClr val="3366CC"/></a:solidFill></c:spPr></c:dPt><c:dPt><c:idx val="1"/><c:spPr><a:solidFill><a:srgbClr val="DC3912"/></a:solidFill></c:spPr></c:dPt></c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>`)
 
     const input = await zip.generateAsync({ type: 'arraybuffer' })
-    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' })
-    const chart = raw.slides[0]?.elements.find((element) => element.type === 'chart')
+    const raw = await parse(input, { imageMode: 'none', videoMode: 'none', audioMode: 'none' }) as any
+    const chart = raw.slides[0]?.elements.find((element: any) => element.type === 'chart')
 
     expect(chart).toMatchObject({
       chartType: 'pieChart',

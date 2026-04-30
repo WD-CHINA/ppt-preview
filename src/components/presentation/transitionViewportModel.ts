@@ -36,13 +36,14 @@ export function getTransitionViewportStyle(input: TransitionViewportInput) {
         return {
           transition,
           opacity: 1,
-          transform: getSplitTransform({ ...input, axisRole: 'previous', progress }),
+          transform: 'none',
+          clipPath: getSplitClipPath({ ...input, axisRole: 'previous', progress }),
         }
       case 'zoom':
         return {
           transition,
           opacity: 1 - progress,
-          transform: `scale(${1 + progress * 0.12})`,
+          transform: `scale(${getZoomScale({ role: 'previous', progress })})`,
         }
       case 'wipe':
         return {
@@ -90,13 +91,14 @@ export function getTransitionViewportStyle(input: TransitionViewportInput) {
         return {
           transition,
           opacity: 1,
-          transform: getSplitTransform({ ...input, axisRole: 'current', progress }),
+          transform: 'none',
+          clipPath: getSplitClipPath({ ...input, axisRole: 'current', progress }),
         }
       case 'zoom':
         return {
           transition,
           opacity: progress,
-          transform: `scale(${0.88 + progress * 0.12})`,
+          transform: `scale(${getZoomScale({ role: 'current', progress })})`,
         }
       case 'wipe':
         return {
@@ -167,22 +169,85 @@ function getWipeClipPath(direction: string | undefined, progress: number) {
   }
 }
 
-function getSplitTransform(
+function getSplitClipPath(
   input: TransitionViewportInput & { axisRole: 'current' | 'previous'; progress: number },
 ) {
   const orientation = input.transitionOrientation ?? 'vert'
   const direction = input.transitionDirection ?? 'out'
-  const currentScale = direction === 'in' ? input.progress : 1 - input.progress
-  const previousScale = direction === 'in' ? 1 - input.progress : input.progress
-  const scale = input.axisRole === 'current' ? currentScale : previousScale
+  const centerFraction = direction === 'in' ? 1 - input.progress : input.progress
+  const region = direction === 'in'
+    ? (input.axisRole === 'current' ? 'outer' : 'center')
+    : (input.axisRole === 'current' ? 'center' : 'outer')
 
-  if (orientation === 'horz') {
-    return `scaleX(${roundTransitionScalar(scale)})`
+  return createSplitClipPath(orientation, centerFraction, region)
+}
+
+function createSplitClipPath(
+  orientation: string,
+  centerFraction: number,
+  region: 'center' | 'outer',
+) {
+  const visibleFraction = roundTransitionScalar(Math.max(0, Math.min(centerFraction, 1)))
+
+  if (region === 'center') {
+    if (visibleFraction <= 0) {
+      return orientation === 'horz'
+        ? 'inset(0 50% 0 50%)'
+        : 'inset(50% 0 50% 0)'
+    }
+
+    if (visibleFraction >= 1) {
+      return 'none'
+    }
+
+    const edgePercent = roundTransitionScalar((1 - visibleFraction) * 50)
+    return orientation === 'horz'
+      ? `inset(0 ${edgePercent}% 0 ${edgePercent}%)`
+      : `inset(${edgePercent}% 0 ${edgePercent}% 0)`
   }
 
-  return `scaleY(${roundTransitionScalar(scale)})`
+  if (visibleFraction <= 0) {
+    return 'none'
+  }
+
+  if (visibleFraction >= 1) {
+    return orientation === 'horz'
+      ? 'inset(0 50% 0 50%)'
+      : 'inset(50% 0 50% 0)'
+  }
+
+  const startPercent = roundTransitionScalar((1 - visibleFraction) * 50)
+  const endPercent = roundTransitionScalar(100 - startPercent)
+
+  if (orientation === 'horz') {
+    return [
+      'polygon(evenodd,',
+      '0 0, 100% 0, 100% 100%, 0 100%, 0 0,',
+      `${startPercent}% 0, ${startPercent}% 100%, ${endPercent}% 100%, ${endPercent}% 0, ${startPercent}% 0)`,
+    ].join(' ')
+  }
+
+  return [
+    'polygon(evenodd,',
+    '0 0, 100% 0, 100% 100%, 0 100%, 0 0,',
+    `0 ${startPercent}%, 100% ${startPercent}%, 100% ${endPercent}%, 0 ${endPercent}%, 0 ${startPercent}%)`,
+  ].join(' ')
 }
 
 function roundTransitionScalar(value: number) {
   return Math.round(value * 1000) / 1000
+}
+
+function getZoomScale(input: { role: 'current' | 'previous'; progress: number }) {
+  const easedProgress = easeOutCubic(input.progress)
+
+  if (input.role === 'current') {
+    return roundTransitionScalar(0.68 + easedProgress * 0.32)
+  }
+
+  return roundTransitionScalar(1 + easedProgress * 0.16)
+}
+
+function easeOutCubic(progress: number) {
+  return 1 - (1 - progress) * (1 - progress) * (1 - progress)
 }

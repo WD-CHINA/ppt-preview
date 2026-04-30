@@ -15,6 +15,7 @@ interface TransitionBaselineCase {
     isTransitioning: boolean
     transitionType?: string
     transitionDirection?: string
+    transitionOrientation?: string | null
     transitionProgress?: number
   }
   viewports: Array<{
@@ -47,11 +48,13 @@ describe('transition regression baseline', () => {
         isTransitioning: baselineCase?.frame.isTransitioning,
         transitionType: baselineCase?.frame.transitionType,
         transitionDirection: baselineCase?.frame.transitionDirection,
+        transitionOrientation: normalizeOptionalString(baselineCase?.frame.transitionOrientation),
       }).toEqual(fixtureCase.expectedFrame)
       expect(
         baselineCase?.viewports.map((viewport) => ({
           role: viewport.role,
           style: {
+            clipPath: normalizeOptionalStyleScalar(viewport.clipPath),
             opacity: normalizeStyleScalar(viewport.opacity),
             transform: viewport.transform,
             transition: 'none',
@@ -69,4 +72,16 @@ function normalizeStyleScalar(value: string | undefined) {
 
   const numericValue = Number(value)
   return Number.isFinite(numericValue) ? numericValue : value
+}
+
+function normalizeOptionalStyleScalar(value: string | undefined) {
+  if (value == null || value === 'none') {
+    return undefined
+  }
+
+  return normalizeStyleScalar(value)
+}
+
+function normalizeOptionalString(value: string | null | undefined) {
+  return value ?? undefined
 }
