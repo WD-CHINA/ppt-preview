@@ -141,6 +141,8 @@ function evaluateElementFrame(
     animationGeometry,
     shape: element.shape,
     table: element.table,
+    chart: element.chart,
+    diagram: element.diagram,
     children: element.children?.map((child) => evaluateElementFrame(slide, child, state)),
   }
 }
@@ -151,12 +153,13 @@ function evaluateElementAnimationState(
   state: PresentationRuntimeState,
 ) {
   const animations = getTargetAnimations(slide, elementId)
+  const visibilityAnimations = getWholeElementAnimations(animations)
 
-  if (animations.length === 0) {
+  if (visibilityAnimations.length === 0) {
     return { visible: true, opacity: 1 }
   }
 
-  return animations.reduce(
+  return visibilityAnimations.reduce(
     (current, animation) => {
       if (animation.effect !== 'appear' && animation.effect !== 'fade') {
         return current
@@ -173,7 +176,7 @@ function evaluateElementAnimationGeometry(
   elementId: string,
   state: PresentationRuntimeState,
 ): EvaluatedAnimationGeometry | undefined {
-  const animations = getTargetAnimations(slide, elementId)
+  const animations = getWholeElementAnimations(getTargetAnimations(slide, elementId))
   const geometryStates = animations
     .map((animation) => evaluateAnimationGeometry(animation, slide.animations, state))
     .filter((geometry): geometry is EvaluatedAnimationGeometry => geometry != null)
@@ -226,7 +229,7 @@ function getVisibleParagraphBuildCount(
     return null
   }
 
-  let visibleParagraphCount = 0
+  let visibleParagraphCount = hasTriggeredWholeElementReveal(slide, elementId, currentTriggerIndex) ? 1 : 0
 
   for (const { animation, index } of paragraphBuilds) {
     if (animation.trigger !== 'onClick' || index >= currentTriggerIndex) {
@@ -239,6 +242,24 @@ function getVisibleParagraphBuildCount(
   return visibleParagraphCount
 }
 
+function hasTriggeredWholeElementReveal(
+  slide: NormalizedSlide,
+  elementId: string,
+  currentTriggerIndex: number,
+) {
+  return slide.animations.some((animation, index) => (
+    index < currentTriggerIndex
+    && animation.trigger === 'onClick'
+    && animation.targetElementIds.includes(elementId)
+    && typeof animation.targetParagraphIndex !== 'number'
+  ))
+}
+
 function getTargetAnimations(slide: NormalizedSlide, elementId: string): NormalizedAnimation[] {
   return slide.animations.filter((candidate) => candidate.targetElementIds.includes(elementId))
+}
+
+function getWholeElementAnimations(animations: NormalizedAnimation[]) {
+  const wholeElementAnimations = animations.filter((animation) => typeof animation.targetParagraphIndex !== 'number')
+  return wholeElementAnimations.length > 0 ? wholeElementAnimations : animations
 }

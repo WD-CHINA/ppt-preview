@@ -111,7 +111,7 @@ export function parseTransition(transitionNode) {
 export function parseAnimations(timingNode, buildListNode) {
   const timingAnimations = timingNode ? parseTimingAnimations(timingNode) : []
   const buildAnimations = buildListNode ? parseBuildListAnimations(buildListNode) : []
-  return dedupeAnimations([...timingAnimations, ...buildAnimations])
+  return dedupeAnimations(resolveCharacterRangeParagraphBuilds([...timingAnimations, ...buildAnimations]))
 }
 
 function parseTimingAnimations(timingNode) {
@@ -137,6 +137,12 @@ function parseTimingAnimations(timingNode) {
     const paragraphIndex = extractParagraphIndex(node)
     if (paragraphIndex != null) {
       animation.targetParagraphIndex = paragraphIndex
+    }
+    else {
+      const characterRange = extractCharacterRange(node)
+      if (characterRange) {
+        animation.targetCharacterRange = characterRange
+      }
     }
 
     const motionPath = extractMotionPath(node)
@@ -174,6 +180,12 @@ function parseBuildListAnimations(buildListNode) {
     const paragraphIndex = extractParagraphIndex(buildNode)
     if (paragraphIndex != null) {
       animation.targetParagraphIndex = paragraphIndex
+    }
+    else {
+      const characterRange = extractCharacterRange(buildNode)
+      if (characterRange) {
+        animation.targetCharacterRange = characterRange
+      }
     }
 
     animations.push(animation)
@@ -254,6 +266,66 @@ function extractParagraphIndex(node) {
   return parseInteger(value)
 }
 
+function extractCharacterRange(node) {
+  const start = parseInteger(readFirstPath(node, [
+    ['p:childTnLst', 'p:set', 'p:cBhvr', 'p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'st'],
+    ['p:childTnLst', 'p:animEffect', 'p:cBhvr', 'p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'st'],
+    ['p:childTnLst', 'p:animMotion', 'p:cBhvr', 'p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'st'],
+    ['p:childTnLst', 'p:anim', 'p:cBhvr', 'p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'st'],
+    ['p:cBhvr', 'p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'st'],
+    ['p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'st'],
+    ['p:txEl', 'p:charRg', 'attrs', 'st'],
+  ]))
+  const end = parseInteger(readFirstPath(node, [
+    ['p:childTnLst', 'p:set', 'p:cBhvr', 'p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'end'],
+    ['p:childTnLst', 'p:animEffect', 'p:cBhvr', 'p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'end'],
+    ['p:childTnLst', 'p:animMotion', 'p:cBhvr', 'p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'end'],
+    ['p:childTnLst', 'p:anim', 'p:cBhvr', 'p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'end'],
+    ['p:cBhvr', 'p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'end'],
+    ['p:tgtEl', 'p:spTgt', 'p:txEl', 'p:charRg', 'attrs', 'end'],
+    ['p:txEl', 'p:charRg', 'attrs', 'end'],
+  ]))
+
+  if (start == null || end == null) {
+    return undefined
+  }
+
+  return { start, end }
+}
+
+function resolveCharacterRangeParagraphBuilds(animations) {
+  const nextParagraphIndexByTarget = new Map()
+
+  return animations.map((animation, index) => {
+    if (
+      animation.trigger !== 'onClick'
+      || animation.targetParagraphIndex != null
+      || !animation.targetCharacterRange
+      || animation.targetElementId == null
+    ) {
+      return animation
+    }
+
+    const targetElementId = String(animation.targetElementId)
+    const hasEarlierWholeReveal = animations.some((candidate, candidateIndex) => (
+      candidateIndex < index
+      && candidate.trigger === 'onClick'
+      && String(candidate.targetElementId ?? '') === targetElementId
+      && candidate.targetParagraphIndex == null
+      && candidate.targetCharacterRange == null
+    ))
+    const startOffset = hasEarlierWholeReveal ? 1 : 0
+    const nextParagraphIndex = nextParagraphIndexByTarget.get(targetElementId) ?? startOffset
+
+    nextParagraphIndexByTarget.set(targetElementId, nextParagraphIndex + 1)
+
+    return {
+      ...animation,
+      targetParagraphIndex: nextParagraphIndex,
+    }
+  })
+}
+
 function extractMotionPath(node) {
   const motionNode = node['p:animMotion'] || getTextByPathList(node, ['p:childTnLst', 'p:animMotion'])
   if (!motionNode || !motionNode.attrs) return undefined
@@ -288,6 +360,7 @@ function dedupeAnimations(animations) {
       effect: animation.effect ?? '',
       targetElementId: animation.targetElementId ?? '',
       targetParagraphIndex: animation.targetParagraphIndex ?? '',
+      targetCharacterRange: animation.targetCharacterRange ?? null,
       motionPath: animation.motionPath ?? null,
     })
 

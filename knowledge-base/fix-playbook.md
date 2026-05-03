@@ -180,6 +180,26 @@
 
 - [src/components/presentation/ElementRenderer.vue](/Applications/work/ppt-preview/src/components/presentation/ElementRenderer.vue)
 
+### 4.4 给零尺寸 connector 一个最小可见 SVG 盒子
+
+适用问题：
+
+- `straightConnector1` 横线或竖线完全不显示
+- parser 已给出 path，但浏览器里线段被 `0px` 容器吞掉
+
+实践方案：
+
+- 对 `width=0` 或 `height=0` 的 line-like shape，不再直接把 bounds 原样映射到 SVG 容器
+- 按 `strokeWidth` 提供最小可见宽高
+- 同时补半个笔画宽度的 `offsetX / offsetY`，保证线条仍对齐原始坐标线
+- path 层补一个中心平移，避免线压在 viewBox 边界上
+
+代码落点：
+
+- [src/components/presentation/shapeSvgLayout.ts](/Applications/work/ppt-preview/src/components/presentation/shapeSvgLayout.ts)
+- [src/components/presentation/shapeSvgLayout.test.ts](/Applications/work/ppt-preview/src/components/presentation/shapeSvgLayout.test.ts)
+- [src/components/presentation/ElementRenderer.vue](/Applications/work/ppt-preview/src/components/presentation/ElementRenderer.vue)
+
 ## 5. 图片与裁剪类
 
 ### 5.1 读取并应用 `srcRect`
@@ -296,6 +316,7 @@
   - 统一把 `targetParagraphIndex` 传到 normalize 层
 - `evaluatePresentationFrame` 再把 paragraph build 可见性投影到 `EvaluatedElementFrame.renderedHtml`
 - `ElementRenderer.vue` 优先渲染 `renderedHtml`，让逐条出现真正落到画面
+- `renderedHtml` 和原始 `html` 一样要经过同一套 sanitizer；否则 paragraph build 虽然算对了，异常 `margin-top` 仍会把真实文本顶出文本框
 - 先把“parser 没读出来”和“文件里确实没有”分开
 - 对明显需要 WPS / PowerPoint 对照的样本，先记录为 `open` 或 `partial`，不要直接写成“样本无动画”
 
@@ -665,3 +686,113 @@ pnpm build
 - Presenter 专用快捷键扩展
 - 激光笔 / 标注模式输入路由
 - 触摸双指 / 长按等更复杂手势
+
+### 7.7 文本 HTML sanitizer 要移除异常 paragraph spacing，但保留缩进语义
+
+适用问题：
+
+- 真实 PPT 页面里文本内容已经从 parser/normalize 正常出来，但浏览器里只剩标题或只显示前几行
+- HTML 内联样式里带着异常 `margin-top / margin-bottom`，把整段内容顶出文本框可视区域
+- 同时又不能把 `margin-left / text-indent` 一刀切掉，否则列表缩进和项目符号结构会坏掉
+
+实践方案：
+
+- 把文本 HTML 清洗逻辑独立到 `textHtmlSanitizer.ts`
+- 对 `p / div / li` 的 `style` 只移除 block spacing：
+  - 去掉 `margin-top`
+  - 去掉 `margin-bottom`
+  - 保留 `margin-left`
+  - 保留 `text-indent`
+  - 保留颜色、字号等 run/paragraph 语义
+- `sanitizePresentationHtml()` 在没有 `DOMParser` 的环境下也提供 fallback：
+  - 用最小正则路径继续清洗 block `style`
+  - 避免 Vitest/Node 环境直接返回空串，让真实 fixture regression 能覆盖到这条逻辑
+
+代码落点：
+
+- [src/components/presentation/textHtmlSanitizer.ts](/Applications/work/ppt-preview/src/components/presentation/textHtmlSanitizer.ts)
+- [src/components/presentation/textHtmlSanitizer.test.ts](/Applications/work/ppt-preview/src/components/presentation/textHtmlSanitizer.test.ts)
+- [src/components/presentation/ElementRenderer.vue](/Applications/work/ppt-preview/src/components/presentation/ElementRenderer.vue)
+- [src/components/presentation/p0501FixtureRegression.test.ts](/Applications/work/ppt-preview/src/components/presentation/p0501FixtureRegression.test.ts)
+
+真实样本：
+
+- [public/0501.pptx](/Applications/work/ppt-preview/public/0501.pptx) 第 `5` 页：原始 HTML 中存在 `margin-top: 20em`，会把章节列表推出可视区；移除异常 block spacing 后，正文恢复可见
+
+仍未完成：
+
+- 更细的 paragraph spacing fidelity 仍未对齐 Office/WPS；当前策略是“防止文本被顶飞”的安全清洗，不是逐像素排版还原
+- 后续若遇到依赖真实 `margin-top / margin-bottom` 的特殊文本框，需再补更细的判定条件，而不是继续一刀切扩大全局规则
+
+### 7.8 深色模板文本框里的“黑色正文”要做最小颜色矫正，而不是全局强制改字色
+
+适用问题：
+
+- 深色底图/深色模板页面里，标题是亮黄/亮青等强调色，但正文被解析成 `#000000`
+- 浏览器里这类正文会贴在深色底上接近不可读，用户主观感受是“文字颜色不对”或“有些字像没显示”
+- 这类问题通常发生在 placeholder/theme 继承链掉色，而不是作者真的要黑字配深底
+
+实践方案：
+
+- 不做全局“黑字一律转白字”，避免误伤浅底黑字页
+- 只在同一文本框满足以下条件时触发最小矫正：
+  - 存在带内容的亮色 run（例如 `#FFFF00 / #00FFCC / #66FFFF / #FFC000`）
+  - 同时存在带内容的深色 run（例如 `#000000 / #111111 / #111827`）
+  - 当前文本框里没有已经存在的近白正文 run
+- 命中后，只把这些带内容的深色 run 提升为 `#FFFFFF`
+- 纯空白 filler span、已有白字正文的文本框，以及本来就是浅底黑字的普通页都不要动
+
+代码落点：
+
+- [src/components/presentation/textHtmlSanitizer.ts](/Applications/work/ppt-preview/src/components/presentation/textHtmlSanitizer.ts)
+- [src/components/presentation/textHtmlSanitizer.test.ts](/Applications/work/ppt-preview/src/components/presentation/textHtmlSanitizer.test.ts)
+- [src/components/presentation/p0501FixtureRegression.test.ts](/Applications/work/ppt-preview/src/components/presentation/p0501FixtureRegression.test.ts)
+
+真实样本：
+
+- [public/0501.pptx](/Applications/work/ppt-preview/public/0501.pptx) 第 `7` 页：标题 run 为亮黄/亮青，正文 run 被解析成 `#000000`；矫正后正文恢复可读，同时保留标题强调色
+
+仍未完成：
+
+- 这仍然是 runtime 层的保守纠偏，不等于 vendor parser 已经完整修好 theme / placeholder text color 继承
+- 后续若要高保真，应继续追到 vendor 文本颜色解析链，而不是无限扩充 renderer 侧启发式
+
+### 7.9 点击动画要先对齐真实 shape id，再把 `charRg` 收敛成 runtime 能消费的 paragraph build
+
+适用问题：
+
+- 真实 PPT 里已经有 `clickEffect`，但浏览器里元素一开始就全都显示
+- 同一文本框在 WPS 中是“先出现标题，再逐条出现列表”，浏览器却只能整块显隐或完全没有节奏
+
+实践方案：
+
+- 先在 vendor parser 里把 OOXML `cNvPr id` 回写到 raw element，不要继续让 normalize 退回合成 id
+- 覆盖范围至少包括：
+  - `shape / text`
+  - `connector`
+  - `pic / video / audio`
+  - `group`
+  - `graphicFrame(table/chart/diagram)`
+- 对 `txEl > charRg` 这类字符范围点击动画，不要直接丢掉；先保留范围信息，再按同 target 的点击顺序映射成最小 `targetParagraphIndex`
+- runtime 侧要区分：
+  - whole-element click reveal：决定元素显隐
+  - paragraph build：只决定 `renderedHtml` 的可见块数，不应再反过来把整块元素隐藏掉
+- paragraph build helper 不能只裁 `<p>`；真实课件里列表经常被 parser 生成为 `<ul><li>...`
+
+代码落点：
+
+- [src/vendor/pptxtojson/pptxtojson.js](/Applications/work/ppt-preview/src/vendor/pptxtojson/pptxtojson.js)
+- [src/vendor/pptxtojson/animation.js](/Applications/work/ppt-preview/src/vendor/pptxtojson/animation.js)
+- [src/adapters/pptxtojson/enhancers/slide-animations.ts](/Applications/work/ppt-preview/src/adapters/pptxtojson/enhancers/slide-animations.ts)
+- [src/runtime/evaluatePresentationFrame.ts](/Applications/work/ppt-preview/src/runtime/evaluatePresentationFrame.ts)
+- [src/runtime/timeline/paragraphBuild.ts](/Applications/work/ppt-preview/src/runtime/timeline/paragraphBuild.ts)
+- [src/components/presentation/p0501FixtureRegression.test.ts](/Applications/work/ppt-preview/src/components/presentation/p0501FixtureRegression.test.ts)
+
+真实样本：
+
+- [public/0501.pptx](/Applications/work/ppt-preview/public/0501.pptx) 第 `2` 页：`Rectangle 3` / `Rectangle 4` 的真实 shape id 分别是 `7171 / 7172`；左侧黄框含 whole-element reveal + 多个 `charRg` clickEffect，右侧绿框是最后一次整块 reveal
+
+仍未完成：
+
+- 这仍然是“把真实样本收敛到现有 runtime 模型”的 first-pass，不等于已经完整支持 Office 的字符级 motion path / object animation
+- 若后续遇到同一文本框内更复杂的 character-range effect，仍可能需要在标准化层单独建立更细的 text build descriptor，而不是继续只靠顺序 paragraphIndex 映射

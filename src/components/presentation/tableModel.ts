@@ -87,22 +87,25 @@ function getTableCellTypography(
   const hasSingleLongWord = isSingleLongWordCell(cell.text)
   const availableWidth = getTableCellAvailableWidth(cell, position, table)
   const hasMultipleParagraphs = isMultiParagraphCell(cell.text)
+  const singleWordText = hasSingleLongWord ? extractTableCellText(cell.text) : ''
 
   if (hasSingleLongWord && fontSize >= 14 && availableWidth != null && availableWidth <= 72) {
+    const compactPadding = '4px 5px'
     return {
-      fontSize: fontSize * 0.8,
+      fontSize: fitSingleWordFontSize(singleWordText, fontSize * 0.8, availableWidth, compactPadding),
       lineHeight: '1.15',
-      padding: '4px 5px',
+      padding: compactPadding,
       wordBreak: 'keep-all' as const,
       overflowWrap: 'normal' as const,
     }
   }
 
   if (hasSingleLongWord && fontSize >= 14) {
+    const relaxedPadding = '5px 6px'
     return {
-      fontSize: fontSize * 0.9,
+      fontSize: fitSingleWordFontSize(singleWordText, fontSize * 0.9, availableWidth, relaxedPadding),
       lineHeight: '1.2',
-      padding: '5px 6px',
+      padding: relaxedPadding,
       wordBreak: 'keep-all' as const,
       overflowWrap: 'normal' as const,
     }
@@ -231,6 +234,71 @@ function extractTableCellText(text?: string) {
   }
 
   return text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function fitSingleWordFontSize(
+  text: string,
+  fontSize: number,
+  availableWidth?: number,
+  padding?: string,
+) {
+  if (!text || !availableWidth || availableWidth <= 0) {
+    return fontSize
+  }
+
+  const horizontalPadding = parseHorizontalPadding(padding)
+  const safetyGap = Math.max(fontSize * 0.3, 6)
+  const usableWidth = Math.max(availableWidth - horizontalPadding - safetyGap, availableWidth * 0.62)
+  const estimatedWidth = estimateWordWidth(text, fontSize)
+
+  if (estimatedWidth <= usableWidth) {
+    return fontSize
+  }
+
+  const ratio = usableWidth / Math.max(estimatedWidth, 1)
+  const fittedFontSize = fontSize * ratio * 0.94
+  return Math.max(10, Number(fittedFontSize.toFixed(2)))
+}
+
+function parseHorizontalPadding(padding?: string) {
+  if (!padding) {
+    return 0
+  }
+
+  const parts = padding
+    .split(/\s+/)
+    .map((part) => Number.parseFloat(part))
+    .filter((part) => Number.isFinite(part))
+
+  if (parts.length === 0) {
+    return 0
+  }
+
+  if (parts.length === 1) {
+    return (parts[0] ?? 0) * 2
+  }
+
+  return (parts[1] ?? parts[0] ?? 0) * 2
+}
+
+function estimateWordWidth(text: string, fontSize: number) {
+  let width = 0
+
+  for (const char of text) {
+    if (/[A-Z]/.test(char)) {
+      width += fontSize * 0.72
+      continue
+    }
+
+    if (/[a-z0-9]/.test(char)) {
+      width += fontSize * 0.58
+      continue
+    }
+
+    width += fontSize * 0.5
+  }
+
+  return width
 }
 
 function formatBorder(side: TableSide, border?: NormalizedTableBorder): CSSProperties {

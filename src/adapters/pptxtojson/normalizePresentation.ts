@@ -2,6 +2,13 @@ import type { RawPptxAnimation, RawPptxDocument, RawPptxElement, RawPptxSlide } 
 import type {
   MediaResource,
   NormalizedAnimation,
+  NormalizedChartAxis,
+  NormalizedChartDataLabels,
+  NormalizedChartMeta,
+  NormalizedChartPoint,
+  NormalizedChartSeries,
+  NormalizedDiagramMeta,
+  NormalizedDiagramTreeNode,
   NormalizedElement,
   NormalizedElementType,
   NormalizedPresentation,
@@ -321,6 +328,8 @@ function normalizeElement(
     media,
     shape: normalizeShapeMeta(rawElement),
     table: normalizeTableMeta(type, rawElement),
+    chart: normalizeChartMeta(type, rawElement),
+    diagram: normalizeDiagramMeta(type, rawElement),
     children: normalizeChildren(rawElement, slideIndex),
     raw: rawElement,
   }
@@ -379,7 +388,7 @@ function normalizeStyle(type: NormalizedElementType, rawElement: RawPptxElement)
 
   return {
     ...base,
-    ...(rawElement.style ?? {}),
+    ...normalizeInlineStyleMap(rawElement.style),
   }
 }
 
@@ -529,6 +538,18 @@ function normalizeCropRatio(value: number | undefined) {
   }
 
   return Math.min(Math.max(value / 100, 0), 0.95)
+}
+
+function normalizeInlineStyleMap(input: unknown): Record<string, string> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {}
+  }
+
+  return Object.fromEntries(
+    Object.entries(input as Record<string, unknown>).filter(
+      ([key, value]) => !/^\d+$/.test(key) && typeof value === 'string',
+    ),
+  ) as Record<string, string>
 }
 
 function normalizeFillImageSource(value: unknown) {
@@ -741,6 +762,253 @@ function normalizeTableBorder(input: unknown): NormalizedTableBorder | undefined
   return Object.keys(border).length > 0 ? border : undefined
 }
 
+function normalizeChartMeta(type: NormalizedElementType, rawElement: RawPptxElement): NormalizedChartMeta | undefined {
+  if (type !== 'chart') {
+    return undefined
+  }
+
+  const chartRecord = rawElement as Record<string, unknown>
+  const schema = toObjectRecord(chartRecord.schema)
+  const rawSeries = Array.isArray(schema?.series)
+    ? schema.series
+    : Array.isArray(chartRecord.series)
+      ? chartRecord.series
+      : []
+  const series = rawSeries.map((entry, index) => normalizeChartSeries(entry, index, chartRecord)).filter(Boolean) as NormalizedChartSeries[]
+  const categories = normalizeStringArray(schema?.categories)
+  const colors = normalizeStringArray(chartRecord.colors)
+
+  if (
+    typeof chartRecord.chartType !== 'string' &&
+    typeof chartRecord.title !== 'string' &&
+    series.length === 0 &&
+    colors.length === 0 &&
+    categories.length === 0
+  ) {
+    return undefined
+  }
+
+  return {
+    chartType: normalizeOptionalString(chartRecord.chartType),
+    title: normalizeOptionalString(chartRecord.title),
+    mode: normalizeOptionalString(schema?.mode),
+    categories,
+    legend: normalizeChartLegend(chartRecord.legend),
+    series: series.map((entry, index) => ({
+      ...entry,
+      color: entry.color ?? colors[index],
+    })),
+    colors,
+    barDirection: normalizeOptionalString(chartRecord.barDir),
+    grouping: normalizeOptionalString(chartRecord.grouping),
+    stacked: normalizeOptionalBoolean(chartRecord.stacked),
+    percentStacked: normalizeOptionalBoolean(chartRecord.percentStacked),
+    dataLabels: normalizeChartDataLabels(chartRecord.dataLabels),
+    categoryAxis: normalizeChartAxis(chartRecord.categoryAxis),
+    valueAxis: normalizeChartAxis(chartRecord.valueAxis),
+  }
+}
+
+function normalizeChartLegend(input: unknown): NormalizedChartMeta['legend'] {
+  const legend = toObjectRecord(input)
+
+  if (!legend) {
+    return undefined
+  }
+
+  const position = normalizeOptionalString(legend.position)
+  const overlay = normalizeOptionalBoolean(legend.overlay)
+
+  if (!position && overlay == null) {
+    return undefined
+  }
+
+  return {
+    position,
+    overlay,
+  }
+}
+
+function normalizeChartSeries(input: unknown, index: number, chartRecord: Record<string, unknown>): NormalizedChartSeries | undefined {
+  const seriesRecord = toObjectRecord(input)
+
+  if (!seriesRecord) {
+    return undefined
+  }
+
+  const key = normalizeOptionalString(seriesRecord.key) ?? normalizeOptionalString(seriesRecord.name) ?? `Series ${index + 1}`
+  const name = normalizeOptionalString(seriesRecord.name) ?? key
+  const values = normalizeNumberArray(seriesRecord.values)
+  const points = normalizeChartPoints(seriesRecord.points, values)
+
+  return {
+    key,
+    name,
+    index: normalizeOptionalString(seriesRecord.index),
+    order: normalizeOptionalString(seriesRecord.order),
+    values,
+    points,
+    color: resolveChartSeriesColor(seriesRecord, chartRecord, index),
+  }
+}
+
+function normalizeChartPoints(input: unknown, values: number[]): NormalizedChartPoint[] {
+  if (!Array.isArray(input)) {
+    return values.map((value, index) => ({
+      x: String(index),
+      y: value,
+    }))
+  }
+
+  const points: NormalizedChartPoint[] = []
+
+  for (const entry of input) {
+    const pointRecord = toObjectRecord(entry)
+
+    if (!pointRecord) {
+      continue
+    }
+
+    const point: NormalizedChartPoint = {}
+    const category = normalizeOptionalString(pointRecord.category)
+    const x = normalizeChartPointX(pointRecord.x)
+    const y = normalizeOptionalNumberValue(pointRecord.y)
+
+    if (category) {
+      point.category = category
+    }
+
+    if (x) {
+      point.x = x
+    }
+
+    if (typeof y === 'number') {
+      point.y = y
+    }
+
+    points.push(point)
+  }
+
+  return points
+}
+
+function normalizeChartPointX(input: unknown) {
+  if (typeof input === 'number' && Number.isFinite(input)) {
+    return input
+  }
+
+  return normalizeOptionalString(input)
+}
+
+function resolveChartSeriesColor(seriesRecord: Record<string, unknown>, chartRecord: Record<string, unknown>, index: number) {
+  const directColor = normalizeOptionalString(seriesRecord.color)
+
+  if (directColor) {
+    return directColor
+  }
+
+  const colors = normalizeStringArray(chartRecord.colors)
+  return colors[index]
+}
+
+function normalizeChartDataLabels(input: unknown): NormalizedChartDataLabels | undefined {
+  const dataLabels = toObjectRecord(input)
+
+  if (!dataLabels) {
+    return undefined
+  }
+
+  const position = normalizeOptionalString(dataLabels.position)
+  const showValue = normalizeOptionalBoolean(dataLabels.showValue)
+  const showCategoryName = normalizeOptionalBoolean(dataLabels.showCategoryName)
+
+  if (!position && showValue == null && showCategoryName == null) {
+    return undefined
+  }
+
+  return {
+    position,
+    showValue,
+    showCategoryName,
+  }
+}
+
+function normalizeChartAxis(input: unknown): NormalizedChartAxis | undefined {
+  const axis = toObjectRecord(input)
+
+  if (!axis) {
+    return undefined
+  }
+
+  const result: NormalizedChartAxis = {
+    id: normalizeOptionalString(axis.id),
+    title: normalizeOptionalString(axis.title),
+    orientation: normalizeOptionalString(axis.orientation),
+    reverseOrder: normalizeOptionalBoolean(axis.reverseOrder),
+    position: normalizeOptionalString(axis.position),
+    crosses: normalizeOptionalString(axis.crosses),
+    majorGridlines: normalizeOptionalBoolean(axis.majorGridlines),
+    minorGridlines: normalizeOptionalBoolean(axis.minorGridlines),
+  }
+
+  return Object.values(result).some((value) => value != null) ? result : undefined
+}
+
+function normalizeDiagramMeta(type: NormalizedElementType, rawElement: RawPptxElement): NormalizedDiagramMeta | undefined {
+  if (type !== 'diagram') {
+    return undefined
+  }
+
+  const diagramRecord = rawElement as Record<string, unknown>
+  const textList = normalizeStringArray(diagramRecord.textList)
+  const nodeCount = Array.isArray(diagramRecord.nodes) ? diagramRecord.nodes.length : 0
+  const relationCount = Array.isArray(diagramRecord.relations) ? diagramRecord.relations.length : 0
+  const tree = normalizeDiagramTree(diagramRecord.tree)
+  const drawingTargetNames = Array.isArray(diagramRecord.drawingTargets)
+    ? diagramRecord.drawingTargets
+        .map((entry) => normalizeOptionalString(toObjectRecord(entry)?.name))
+        .filter((entry): entry is string => Boolean(entry))
+    : []
+
+  if (!diagramRecord.layoutKind && textList.length === 0 && nodeCount === 0 && relationCount === 0 && drawingTargetNames.length === 0 && tree.length === 0) {
+    return undefined
+  }
+
+  return {
+    layoutKind: normalizeOptionalString(diagramRecord.layoutKind),
+    tree,
+    textList,
+    nodeCount,
+    relationCount,
+    drawingTargetNames,
+  }
+}
+
+function normalizeDiagramTree(input: unknown): NormalizedDiagramTreeNode[] {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  return input
+    .map((entry) => normalizeDiagramTreeNode(entry))
+    .filter((entry): entry is NormalizedDiagramTreeNode => Boolean(entry))
+}
+
+function normalizeDiagramTreeNode(input: unknown): NormalizedDiagramTreeNode | undefined {
+  const treeNode = toObjectRecord(input)
+
+  if (!treeNode) {
+    return undefined
+  }
+
+  return {
+    id: normalizeOptionalString(treeNode.id),
+    type: normalizeOptionalString(treeNode.type),
+    text: normalizeOptionalString(treeNode.text),
+    children: normalizeDiagramTree(treeNode.children),
+  }
+}
+
 function normalizeShapeMeta(rawElement: RawPptxElement) {
   if (
     typeof rawElement.path !== 'string' &&
@@ -777,6 +1045,49 @@ function normalizeShapeMeta(rawElement: RawPptxElement) {
         }
       : undefined,
   }
+}
+
+function toObjectRecord(input: unknown): Record<string, unknown> | undefined {
+  return input && typeof input === 'object' ? input as Record<string, unknown> : undefined
+}
+
+function normalizeStringArray(input: unknown) {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  return input.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+}
+
+function normalizeNumberArray(input: unknown) {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  return input
+    .map((entry) => normalizeOptionalNumberValue(entry))
+    .filter((entry): entry is number => typeof entry === 'number')
+}
+
+function normalizeOptionalString(input: unknown) {
+  return typeof input === 'string' && input.trim().length > 0 ? input.trim() : undefined
+}
+
+function normalizeOptionalBoolean(input: unknown) {
+  return typeof input === 'boolean' ? input : undefined
+}
+
+function normalizeOptionalNumberValue(input: unknown) {
+  if (typeof input === 'number' && Number.isFinite(input)) {
+    return input
+  }
+
+  if (typeof input === 'string') {
+    const parsed = Number(input)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+
+  return undefined
 }
 
 function looksLikeHtml(input: string) {

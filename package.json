@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:visual-baselines": "node fixtures/visual-baselines/validateTransitionVisualBaselines.mjs"
+    "test:visual-baselines": "node fixtures/visual-baselines/validateVisualBaselineAssets.mjs",
+    "generate:public-ppt-page-baselines": "node fixtures/visual-baselines/buildPublicPptPageVisualBaselinesManifest.mjs",
+    "generate:public-ppt-registry": "node fixtures/visual-baselines/buildPublicPptFixtureRegistry.mjs",
+    "generate:complex-fixture": "node fixtures/generate-complex-element-fixture.mjs"
   },
   "dependencies": {
     "jszip": "^3.10.1",

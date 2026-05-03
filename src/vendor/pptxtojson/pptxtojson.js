@@ -705,6 +705,7 @@ async function processMathNode(node, warpObj, source) {
 
 async function processGroupSpNode(node, warpObj, source, parentGroupHierarchy = []) {
   const order = node['attrs']['order']
+  const id = getTextByPathList(node, ['p:nvGrpSpPr', 'p:cNvPr', 'attrs', 'id'])
   const xfrmNode = getTextByPathList(node, ['p:grpSpPr', 'a:xfrm'])
   if (!xfrmNode) return null
 
@@ -774,6 +775,7 @@ async function processGroupSpNode(node, warpObj, source, parentGroupHierarchy = 
   }
 
   return {
+    ...(id ? { id } : {}),
     type: 'group',
     top: numberToFixed(y),
     left: numberToFixed(x),
@@ -789,6 +791,7 @@ async function processGroupSpNode(node, warpObj, source, parentGroupHierarchy = 
 
 async function processSpNode(node, warpObj, source, groupHierarchy = []) {
   const cNvPr = getTextByPathList(node, ['p:nvSpPr', 'p:cNvPr'])
+  const id = getTextByPathList(cNvPr, ['attrs', 'id'])
   const name = getTextByPathList(cNvPr, ['attrs', 'name'])
   const idx = getTextByPathList(node, ['p:nvSpPr', 'p:nvPr', 'p:ph', 'attrs', 'idx'])
   let type = getTextByPathList(node, ['p:nvSpPr', 'p:nvPr', 'p:ph', 'attrs', 'type'])
@@ -828,20 +831,21 @@ async function processSpNode(node, warpObj, source, groupHierarchy = []) {
 
   const link = getHyperlinkFromCNvPr(cNvPr, warpObj)
 
-  return await genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, order, warpObj, source, link, groupHierarchy)
+  return await genShape(node, slideLayoutSpNode, slideMasterSpNode, id, name, type, order, warpObj, source, link, groupHierarchy)
 }
 
 async function processCxnSpNode(node, warpObj, source) {
   const cNvPr = getTextByPathList(node, ['p:nvCxnSpPr', 'p:cNvPr'])
+  const id = getTextByPathList(cNvPr, ['attrs', 'id'])
   const name = getTextByPathList(cNvPr, ['attrs', 'name'])
   const type = (node['p:nvCxnSpPr']['p:nvPr']['p:ph'] === undefined) ? undefined : node['p:nvCxnSpPr']['p:nvPr']['p:ph']['attrs']['type']
   const order = node['attrs']['order']
   const link = getHyperlinkFromCNvPr(cNvPr, warpObj)
 
-  return await genShape(node, undefined, undefined, name, type, order, warpObj, source, link)
+  return await genShape(node, undefined, undefined, id, name, type, order, warpObj, source, link)
 }
 
-async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, order, warpObj, source, link, groupHierarchy = []) {
+async function genShape(node, slideLayoutSpNode, slideMasterSpNode, id, name, type, order, warpObj, source, link, groupHierarchy = []) {
   const xfrmList = ['p:spPr', 'a:xfrm']
   const slideXfrmNode = getTextByPathList(node, xfrmList)
   const slideLayoutXfrmNode = getTextByPathList(slideLayoutSpNode, xfrmList)
@@ -902,6 +906,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   const bulletMarkers = readBulletMarkers(node)
 
   const data = {
+    ...(id ? { id } : {}),
     left,
     top,
     width,
@@ -987,6 +992,7 @@ async function processPicNode(node, warpObj, source) {
   else resObj = warpObj['slideResObj']
 
   const cNvPr = getTextByPathList(node, ['p:nvPicPr', 'p:cNvPr'])
+  const id = getTextByPathList(cNvPr, ['attrs', 'id'])
   const link = getHyperlinkFromCNvPr(cNvPr, warpObj)
   const order = node['attrs']['order']
   
@@ -1071,6 +1077,7 @@ async function processPicNode(node, warpObj, source) {
 
   if (videoNode && !isVdeoLink) {
     return {
+      ...(id ? { id } : {}),
       type: 'video',
       top,
       left,
@@ -1084,6 +1091,7 @@ async function processPicNode(node, warpObj, source) {
   } 
   if (videoNode && isVdeoLink) {
     return {
+      ...(id ? { id } : {}),
       type: 'video',
       top,
       left,
@@ -1097,6 +1105,7 @@ async function processPicNode(node, warpObj, source) {
   }
   if (audioNode) {
     return {
+      ...(id ? { id } : {}),
       type: 'audio',
       top,
       left,
@@ -1135,6 +1144,7 @@ async function processPicNode(node, warpObj, source) {
   const filters = getPicFilters(node['p:blipFill'])
 
   const imageDataJson = {
+    ...(id ? { id } : {}),
     type: 'image',
     top,
     left,
@@ -1163,17 +1173,18 @@ async function processPicNode(node, warpObj, source) {
 
 async function processGraphicFrameNode(node, warpObj, source) {
   const graphicTypeUri = getTextByPathList(node, ['a:graphic', 'a:graphicData', 'attrs', 'uri'])
+  const id = getTextByPathList(node, ['p:nvGraphicFramePr', 'p:cNvPr', 'attrs', 'id'])
   
   let result
   switch (graphicTypeUri) {
     case 'http://schemas.openxmlformats.org/drawingml/2006/table':
-      result = await genTable(node, warpObj)
+      result = await genTable(node, warpObj, id)
       break
     case 'http://schemas.openxmlformats.org/drawingml/2006/chart':
-      result = await genChart(node, warpObj)
+      result = await genChart(node, warpObj, id)
       break
     case 'http://schemas.openxmlformats.org/drawingml/2006/diagram':
-      result = await genDiagram(node, warpObj)
+      result = await genDiagram(node, warpObj, id)
       break
     case 'http://schemas.openxmlformats.org/presentationml/2006/ole':
       let oleObjNode = getTextByPathList(node, ['a:graphic', 'a:graphicData', 'mc:AlternateContent', 'mc:Fallback', 'p:oleObj'])
@@ -1185,7 +1196,7 @@ async function processGraphicFrameNode(node, warpObj, source) {
   return result
 }
 
-async function genTable(node, warpObj) {
+async function genTable(node, warpObj, id) {
   const order = node['attrs']['order']
   const tableNode = getTextByPathList(node, ['a:graphic', 'a:graphicData', 'a:tbl'])
   const xfrmNode = getTextByPathList(node, ['p:xfrm'])
@@ -1416,6 +1427,7 @@ async function genTable(node, warpObj) {
   if (actualTableWidth) actualTableWidth = numberToFixed(actualTableWidth)
 
   return {
+    ...(id ? { id } : {}),
     type: 'table',
     top,
     left,
@@ -1429,7 +1441,7 @@ async function genTable(node, warpObj) {
   }
 }
 
-async function genChart(node, warpObj) {
+async function genChart(node, warpObj, id) {
   const order = node['attrs']['order']
   const xfrmNode = getTextByPathList(node, ['p:xfrm'])
   const { top, left } = getPosition(xfrmNode, undefined, undefined)
@@ -1450,6 +1462,7 @@ async function genChart(node, warpObj) {
   if (!chart) return null
 
   const data = {
+    ...(id ? { id } : {}),
     type: 'chart',
     top,
     left,
@@ -1482,7 +1495,7 @@ async function genChart(node, warpObj) {
   return data
 }
 
-async function genDiagram(node, warpObj) {
+async function genDiagram(node, warpObj, id) {
   const order = node['attrs']['order']
   const xfrmNode = getTextByPathList(node, ['p:xfrm'])
   const { left, top } = getPosition(xfrmNode, undefined, undefined)
@@ -1511,6 +1524,7 @@ async function genDiagram(node, warpObj) {
   }
 
   return {
+    ...(id ? { id } : {}),
     type: 'diagram',
     left,
     top,

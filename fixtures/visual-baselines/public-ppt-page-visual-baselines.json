@@ -1,0 +1,275 @@
+{
+  "generatedAt": "2026-05-02T00:24:39.190Z",
+  "baseUrl": "http://localhost:5173",
+  "waitMs": 1200,
+  "captures": [
+    {
+      "caseId": "p0501-slide-2-build-layout",
+      "fileName": "p0501-slide-2-build-layout-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/p0501-slide-2-build-layout-browser.png",
+      "fixtureFileName": "0501.pptx",
+      "slide": 2,
+      "url": "http://localhost:5173/?fixture=0501.pptx&slide=2",
+      "tags": [
+        "timing",
+        "paragraph-build",
+        "text-layout"
+      ],
+      "note": "左侧黄框 click build 与右侧绿框整块 reveal 的初始静态页布局。",
+      "bytes": 291124
+    },
+    {
+      "caseId": "p0501-slide-5-outline-list",
+      "fileName": "p0501-slide-5-outline-list-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/p0501-slide-5-outline-list-browser.png",
+      "fixtureFileName": "0501.pptx",
+      "slide": 5,
+      "url": "http://localhost:5173/?fixture=0501.pptx&slide=5",
+      "tags": [
+        "paragraph-margin",
+        "html-sanitizer",
+        "text-layout"
+      ],
+      "note": "章节列表不应被异常 paragraph margin 顶出可视区。",
+      "bytes": 327307
+    },
+    {
+      "caseId": "p0501-slide-7-dark-body-copy",
+      "fileName": "p0501-slide-7-dark-body-copy-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/p0501-slide-7-dark-body-copy-browser.png",
+      "fixtureFileName": "0501.pptx",
+      "slide": 7,
+      "url": "http://localhost:5173/?fixture=0501.pptx&slide=7",
+      "tags": [
+        "text-color",
+        "dark-template"
+      ],
+      "note": "深色模板页正文颜色应可读。",
+      "bytes": 325340
+    },
+    {
+      "caseId": "ai-tech-slide-1-cover-title",
+      "fileName": "ai-tech-slide-1-cover-title-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/ai-tech-slide-1-cover-title-browser.png",
+      "fixtureFileName": "AI.Tech.Agency.Infographics.by.Slidesgo.pptx",
+      "slide": 1,
+      "url": "http://localhost:5173/?fixture=AI.Tech.Agency.Infographics.by.Slidesgo.pptx&slide=1",
+      "tags": [
+        "text-layout",
+        "nbsp"
+      ],
+      "note": "封面标题、副标题的英文排版与换行。",
+      "bytes": 538385
+    },
+    {
+      "caseId": "ai-tech-slide-4-connectors",
+      "fileName": "ai-tech-slide-4-connectors-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/ai-tech-slide-4-connectors-browser.png",
+      "fixtureFileName": "AI.Tech.Agency.Infographics.by.Slidesgo.pptx",
+      "slide": 4,
+      "url": "http://localhost:5173/?fixture=AI.Tech.Agency.Infographics.by.Slidesgo.pptx&slide=4",
+      "tags": [
+        "connector",
+        "shape-svg",
+        "zero-size-bounds"
+      ],
+      "note": "流程卡片之间的 connector 与图形可见性。",
+      "bytes": 377379
+    },
+    {
+      "caseId": "ai-tech-slide-5-pricing-table",
+      "fileName": "ai-tech-slide-5-pricing-table-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/ai-tech-slide-5-pricing-table-browser.png",
+      "fixtureFileName": "AI.Tech.Agency.Infographics.by.Slidesgo.pptx",
+      "slide": 5,
+      "url": "http://localhost:5173/?fixture=AI.Tech.Agency.Infographics.by.Slidesgo.pptx&slide=5",
+      "tags": [
+        "table",
+        "table-typography",
+        "nbsp"
+      ],
+      "note": "pricing table 的长英文表头与正文 bullet 排版。",
+      "bytes": 394872
+    },
+    {
+      "caseId": "ai-tech-slide-24-merged-table",
+      "fileName": "ai-tech-slide-24-merged-table-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/ai-tech-slide-24-merged-table-browser.png",
+      "fixtureFileName": "AI.Tech.Agency.Infographics.by.Slidesgo.pptx",
+      "slide": 24,
+      "url": "http://localhost:5173/?fixture=AI.Tech.Agency.Infographics.by.Slidesgo.pptx&slide=24",
+      "tags": [
+        "table",
+        "table-merge",
+        "table-typography"
+      ],
+      "note": "含 hMerge / gridSpan 的 table 结构与小字排版。",
+      "bytes": 367666
+    },
+    {
+      "caseId": "ai-tech-slide-26-planning-table",
+      "fileName": "ai-tech-slide-26-planning-table-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/ai-tech-slide-26-planning-table-browser.png",
+      "fixtureFileName": "AI.Tech.Agency.Infographics.by.Slidesgo.pptx",
+      "slide": 26,
+      "url": "http://localhost:5173/?fixture=AI.Tech.Agency.Infographics.by.Slidesgo.pptx&slide=26",
+      "tags": [
+        "table",
+        "table-typography"
+      ],
+      "note": "5 x 6 planning table 的小字可读性与对齐。",
+      "bytes": 408668
+    },
+    {
+      "caseId": "ai-tech-slide-31-tasks-table",
+      "fileName": "ai-tech-slide-31-tasks-table-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/ai-tech-slide-31-tasks-table-browser.png",
+      "fixtureFileName": "AI.Tech.Agency.Infographics.by.Slidesgo.pptx",
+      "slide": 31,
+      "url": "http://localhost:5173/?fixture=AI.Tech.Agency.Infographics.by.Slidesgo.pptx&slide=31",
+      "tags": [
+        "table",
+        "table-typography"
+      ],
+      "note": "4 x 5 tasks table 的边框与文字稳定性。",
+      "bytes": 376444
+    },
+    {
+      "caseId": "core-4b00-slide-1-cover-layout",
+      "fileName": "core-4b00-slide-1-cover-layout-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/core-4b00-slide-1-cover-layout-browser.png",
+      "fixtureFileName": "4b00a85c247c47bdaeb01aeec562c90f.pptx",
+      "slide": 1,
+      "url": "http://localhost:5173/?fixture=4b00a85c247c47bdaeb01aeec562c90f.pptx&slide=1",
+      "tags": [
+        "text-position",
+        "shape-position",
+        "cover-layout"
+      ],
+      "note": "封面标题、顶部小标签与多边形定位。",
+      "bytes": 494808
+    },
+    {
+      "caseId": "core-4b00-slide-4-annotation-layout",
+      "fileName": "core-4b00-slide-4-annotation-layout-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/core-4b00-slide-4-annotation-layout-browser.png",
+      "fixtureFileName": "4b00a85c247c47bdaeb01aeec562c90f.pptx",
+      "slide": 4,
+      "url": "http://localhost:5173/?fixture=4b00a85c247c47bdaeb01aeec562c90f.pptx&slide=4",
+      "tags": [
+        "helper-frame",
+        "connector",
+        "arrow-marker",
+        "text-wrap"
+      ],
+      "note": "辅助虚线框、标注线与底部说明文字换行。",
+      "bytes": 445324
+    },
+    {
+      "caseId": "core-4b00-slide-7-arrow-alignment",
+      "fileName": "core-4b00-slide-7-arrow-alignment-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/core-4b00-slide-7-arrow-alignment-browser.png",
+      "fixtureFileName": "4b00a85c247c47bdaeb01aeec562c90f.pptx",
+      "slide": 7,
+      "url": "http://localhost:5173/?fixture=4b00a85c247c47bdaeb01aeec562c90f.pptx&slide=7",
+      "tags": [
+        "arrow-marker",
+        "connector",
+        "annotation"
+      ],
+      "note": "箭头长度、方向与落点对齐。",
+      "bytes": 398648
+    },
+    {
+      "caseId": "core-4b00-slide-20-shadow-layout",
+      "fileName": "core-4b00-slide-20-shadow-layout-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/core-4b00-slide-20-shadow-layout-browser.png",
+      "fixtureFileName": "4b00a85c247c47bdaeb01aeec562c90f.pptx",
+      "slide": 20,
+      "url": "http://localhost:5173/?fixture=4b00a85c247c47bdaeb01aeec562c90f.pptx&slide=20",
+      "tags": [
+        "shape-shadow",
+        "text-position",
+        "farewell-layout"
+      ],
+      "note": "shape 阴影与文本布局不应互相干扰。",
+      "bytes": 382025
+    },
+    {
+      "caseId": "district-slide-2-title-bullets",
+      "fileName": "district-slide-2-title-bullets-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/district-slide-2-title-bullets-browser.png",
+      "fixtureFileName": "区级平台介绍.pptx",
+      "slide": 2,
+      "url": "http://localhost:5173/?fixture=%E5%8C%BA%E7%BA%A7%E5%B9%B3%E5%8F%B0%E4%BB%8B%E7%BB%8D.pptx&slide=2",
+      "tags": [
+        "text-wrap",
+        "bullet",
+        "single-line-title"
+      ],
+      "note": "标题单行、自定义 bullet 为 √，空列表项不残留。",
+      "bytes": 470880
+    },
+    {
+      "caseId": "district-slide-4-thumbnail-crop",
+      "fileName": "district-slide-4-thumbnail-crop-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/district-slide-4-thumbnail-crop-browser.png",
+      "fixtureFileName": "区级平台介绍.pptx",
+      "slide": 4,
+      "url": "http://localhost:5173/?fixture=%E5%8C%BA%E7%BA%A7%E5%B9%B3%E5%8F%B0%E4%BB%8B%E7%BB%8D.pptx&slide=4",
+      "tags": [
+        "image-crop",
+        "thumbnail",
+        "layout"
+      ],
+      "note": "右侧缩略图裁剪结果不应退化成细条。",
+      "bytes": 459158
+    },
+    {
+      "caseId": "watercolor-slide-1-hero-title",
+      "fileName": "watercolor-slide-1-hero-title-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/watercolor-slide-1-hero-title-browser.png",
+      "fixtureFileName": "watercolor.pptx",
+      "slide": 1,
+      "url": "http://localhost:5173/?fixture=watercolor.pptx&slide=1",
+      "tags": [
+        "text-wrap",
+        "single-line-heuristic",
+        "hero-title"
+      ],
+      "note": "大标题 MINIMALIST AESTHETIC SLIDESHOW 的换行与层级。",
+      "bytes": 330752
+    },
+    {
+      "caseId": "watercolor-slide-3-columns-theme",
+      "fileName": "watercolor-slide-3-columns-theme-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/watercolor-slide-3-columns-theme-browser.png",
+      "fixtureFileName": "watercolor.pptx",
+      "slide": 3,
+      "url": "http://localhost:5173/?fixture=watercolor.pptx&slide=3",
+      "tags": [
+        "text-wrap",
+        "text-color",
+        "theme-color",
+        "columns"
+      ],
+      "note": "目录页三列正文的换行与颜色一致性。",
+      "bytes": 312325
+    },
+    {
+      "caseId": "watercolor-slide-10-body-theme-color",
+      "fileName": "watercolor-slide-10-body-theme-color-browser.png",
+      "outputPath": "/Applications/work/ppt-preview/fixtures/visual-baselines/watercolor-slide-10-body-theme-color-browser.png",
+      "fixtureFileName": "watercolor.pptx",
+      "slide": 10,
+      "url": "http://localhost:5173/?fixture=watercolor.pptx&slide=10",
+      "tags": [
+        "text-color",
+        "theme-color",
+        "placeholder"
+      ],
+      "note": "两列正文应继承模板浅棕主题色。",
+      "bytes": 312130
+    }
+  ]
+}

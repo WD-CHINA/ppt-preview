@@ -6,7 +6,7 @@ import { defaultTransitionVisualCases } from './captureTransitionVisualBaselines
 const outputDir = path.resolve('fixtures/visual-baselines')
 const manifestPath = path.join(outputDir, 'transition-visual-baselines.json')
 
-async function main() {
+export async function validateTransitionVisualBaselines() {
   const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'))
   const failures = []
 
@@ -76,15 +76,19 @@ async function main() {
   }
 
   if (failures.length > 0) {
-    console.error('Transition visual baselines validation failed:')
-    for (const failure of failures) {
-      console.error(`- ${failure}`)
-    }
-    process.exitCode = 1
-    return
+    throw new Error(failures.map((failure) => `- ${failure}`).join('\n'))
   }
 
-  console.log(`Transition visual baselines validated: ${expectedCaseIds.length} cases`)
+  return {
+    caseCount: expectedCaseIds.length,
+  }
 }
 
-await main()
+try {
+  const result = await validateTransitionVisualBaselines()
+  console.log(`Transition visual baselines validated: ${result.caseCount} cases`)
+} catch (error) {
+  console.error('Transition visual baselines validation failed:')
+  console.error(error instanceof Error ? error.message : String(error))
+  process.exitCode = 1
+}

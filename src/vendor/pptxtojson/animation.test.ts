@@ -126,4 +126,112 @@ describe('vendor animation parser', () => {
       },
     ])
   })
+
+  it('maps char-range click effects into sequential paragraph builds for runtime playback', () => {
+    const slideContent = {
+      'p:sld': {
+        'p:timing': {
+          'p:tnLst': {
+            'p:par': {
+              'p:cTn': {
+                attrs: { id: '1', nodeType: 'tmRoot' },
+                'p:childTnLst': {
+                  'p:seq': {
+                    'p:cTn': {
+                      attrs: { id: '2', nodeType: 'mainSeq' },
+                      'p:childTnLst': {
+                        'p:par': [
+                          {
+                            'p:cTn': {
+                              attrs: { id: '11', nodeType: 'clickEffect' },
+                              'p:childTnLst': {
+                                'p:set': {
+                                  'p:cBhvr': {
+                                    'p:cTn': { attrs: { dur: '500' } },
+                                    'p:tgtEl': { 'p:spTgt': { attrs: { spid: '7171' } } },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                          {
+                            'p:cTn': {
+                              attrs: { id: '12', nodeType: 'clickEffect' },
+                              'p:childTnLst': {
+                                'p:set': {
+                                  'p:cBhvr': {
+                                    'p:cTn': { attrs: { dur: '500' } },
+                                    'p:tgtEl': {
+                                      'p:spTgt': {
+                                        attrs: { spid: '7171' },
+                                        'p:txEl': {
+                                          'p:charRg': { attrs: { st: '0', end: '8' } },
+                                        },
+                                      },
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                          {
+                            'p:cTn': {
+                              attrs: { id: '13', nodeType: 'clickEffect' },
+                              'p:childTnLst': {
+                                'p:set': {
+                                  'p:cBhvr': {
+                                    'p:cTn': { attrs: { dur: '500' } },
+                                    'p:tgtEl': {
+                                      'p:spTgt': {
+                                        attrs: { spid: '7171' },
+                                        'p:txEl': {
+                                          'p:charRg': { attrs: { st: '9', end: '18' } },
+                                        },
+                                      },
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    expect(parseAnimations(findTimingNode(slideContent, 'p:sld'), null)).toEqual([
+      {
+        id: '11',
+        trigger: 'onClick',
+        durationMs: 500,
+        effect: 'appear',
+        targetElementId: '7171',
+      },
+      {
+        id: '12',
+        trigger: 'onClick',
+        durationMs: 500,
+        effect: 'appear',
+        targetElementId: '7171',
+        targetParagraphIndex: 1,
+        targetCharacterRange: { start: 0, end: 8 },
+      },
+      {
+        id: '13',
+        trigger: 'onClick',
+        durationMs: 500,
+        effect: 'appear',
+        targetElementId: '7171',
+        targetParagraphIndex: 2,
+        targetCharacterRange: { start: 9, end: 18 },
+      },
+    ])
+  })
 })

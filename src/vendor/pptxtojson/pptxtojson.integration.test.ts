@@ -198,6 +198,7 @@ describe('vendor pptxtojson integration', () => {
       },
     ])
     expect(title).toMatchObject({
+      id: '2',
       placeholderType: 'title',
       placeholderIndex: 1,
       lineHeadEnd: { type: 'triangle', width: 'med', length: 'med' },
@@ -227,6 +228,7 @@ describe('vendor pptxtojson integration', () => {
     expect(title.content).toContain('--pptx-lang: en-US;')
     expect(title.content).toContain('--pptx-script: ja-JP;')
     expect(title.content).toContain('--pptx-tab-stops: 72pt l;')
+    expect(image).toMatchObject({ id: '3' })
     expect(typeof image.base64).toBe('string')
     expect(image.base64.startsWith('data:image/svg+xml;base64,')).toBe(true)
   })

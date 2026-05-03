@@ -118,7 +118,7 @@ describe('tableModel', () => {
     expect(narrowLabel).toBeDefined()
     expect(regularCell).toBeDefined()
     expect(getTableCellStyle(narrowLabel!.cell, narrowLabel, table)).toMatchObject({
-      fontSize: '12.8px',
+      fontSize: '10px',
       lineHeight: '1.15',
       padding: '4px 5px',
       wordBreak: 'keep-all',
@@ -128,6 +128,25 @@ describe('tableModel', () => {
       fontSize: '16px',
       lineHeight: '1.35',
       padding: '6px 8px',
+    })
+  })
+
+  it('shrinks wide uppercase labels against real column widths instead of relying on hard splits', () => {
+    const table: NormalizedTableMeta = {
+      rowHeights: [20],
+      colWidths: [261.706],
+      cells: [[{ text: '<p>INTERMEDIATE</p>', fontSize: 32, fontBold: true }]],
+    }
+
+    const [labelCell] = getRenderableTableCells(table)
+
+    expect(labelCell).toBeDefined()
+    expect(getTableCellStyle(labelCell!.cell, labelCell, table)).toMatchObject({
+      fontSize: '26.23px',
+      lineHeight: '1.2',
+      padding: '5px 6px',
+      wordBreak: 'keep-all',
+      overflowWrap: 'normal',
     })
   })
 

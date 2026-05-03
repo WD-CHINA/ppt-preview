@@ -2,6 +2,10 @@
 
 本文档记录当前项目中的高频问题 PPT 样本、页面清单和问题标签。
 
+如果需要先从机器可读入口了解 `public/` 下全部 PPT 当前覆盖状态，优先读取：
+
+- [fixtures/visual-baselines/public-ppt-fixture-registry.json](/Applications/work/ppt-preview/fixtures/visual-baselines/public-ppt-fixture-registry.json)
+
 状态说明：
 
 - `active`: 当前仍在用于复现或回归
@@ -30,6 +34,11 @@
   标签：`shape-border`, `shape-path`
 - 第 20 页：再见，shape 阴影与文本布局相互干扰  
   标签：`shape-shadow`, `text-position`
+- 浏览器视觉基线：已登记到 `public-ppt-page-visual-baselines.json`
+  - `core-4b00-slide-1-cover-layout`
+  - `core-4b00-slide-4-annotation-layout`
+  - `core-4b00-slide-7-arrow-alignment`
+  - `core-4b00-slide-20-shadow-layout`
 
 ## 2. `区级平台介绍.pptx`
 
@@ -43,6 +52,9 @@
   标签：`text-wrap`, `bullet`
 - 第 4 页：学校信息，右侧缩略图是裁剪图，不应显示成细条  
   标签：`image-crop`, `thumbnail`
+- 浏览器视觉基线：已登记到 `public-ppt-page-visual-baselines.json`
+  - `district-slide-2-title-bullets`
+  - `district-slide-4-thumbnail-crop`
 
 ## 3. `watercolor.pptx`
 
@@ -58,6 +70,10 @@
   标签：`text-wrap`, `text-color`, `theme-color`
 - 第 10 页：两列正文颜色应继承模板浅棕主题色  
   标签：`text-color`, `theme-color`, `placeholder`
+- 浏览器视觉基线：已登记到 `public-ppt-page-visual-baselines.json`
+  - `watercolor-slide-1-hero-title`
+  - `watercolor-slide-3-columns-theme`
+  - `watercolor-slide-10-body-theme-color`
 
 ## 4. `math_calculus_formulas.pptx`
 
@@ -78,6 +94,8 @@
 
 关注点：
 
+- 第 4 页：四段流程卡片之间的 connector/辅助线；本轮已确认 parser 能给出 `straightConnector1` path，但其中一批元素 `width=0` 或 `height=0`，需要 renderer 侧做最小可见盒子兜底，否则浏览器里会整段消失  
+  标签：`connector`, `zero-size-bounds`, `shape-svg`
 - 第 5 页：3 x 3 table；已完成浏览器视觉冒烟验证，结构稳定、无明显双线或重复渲染，但 `INTERMEDIATE` 等英文仍有硬拆分，正文 typography 仍待补强
 - 第 24 页：5 x 2 table，包含 `gridSpan / hMerge` 合并单元格；已完成浏览器视觉冒烟验证，结构可读且未见明显内部双线；本轮已补基础 table typography 字段归一化与渲染样式映射
 - 第 26 页：5 x 6 table；已完成浏览器视觉冒烟验证，结构对齐正常，未见明显重复渲染或内部双线，但单元格小字在舞台预览中仍偏小
@@ -334,3 +352,40 @@
 - `animation`
 - `paragraph-build`
 - `object-animation`
+
+## 16. Complex element synthetic regression fixture
+
+- 文件位置：[public/chart-diagram-fixture.pptx](/Applications/work/ppt-preview/public/chart-diagram-fixture.pptx)
+- 说明文档：[fixtures/complex-element-regression-cases.md](./complex-element-regression-cases.md)
+- 状态：`targeted-fixture`
+- 用途：补齐仓库当前缺失的 `chart / diagram` 页面样本，先锁住 parser -> normalize -> renderer 主链路
+
+标签：
+
+- `chart`
+- `diagram`
+- `smartart`
+- `complex-element`
+
+## 17. `0501.pptx` text margin regression fixture
+
+- 文件位置：[public/0501.pptx](/Applications/work/ppt-preview/public/0501.pptx)
+- 代表测试：
+  - [src/components/presentation/p0501FixtureRegression.test.ts](/Applications/work/ppt-preview/src/components/presentation/p0501FixtureRegression.test.ts)
+  - [src/components/presentation/textHtmlSanitizer.test.ts](/Applications/work/ppt-preview/src/components/presentation/textHtmlSanitizer.test.ts)
+- 状态：`targeted-fixture`
+- 用途：锁住真实课件里“文本内容已经解析出来，但被异常 paragraph margin 顶出文本框”的回归；当前已覆盖第 `5` 页章节列表样本，重点验证 `margin-top / margin-bottom` 清洗与 `margin-left / text-indent` 保留
+
+标签：
+
+- `text`
+- `paragraph-margin`
+- `html-sanitizer`
+- `real-fixture`
+- `0501`
+
+补充覆盖：
+
+- 第 `2` 页：真实 click timing 使用 `spid=7171 / 7172`，并带 `txEl > charRg` 的逐次 reveal；当前 fixture regression 已锁住真实 shape id 贯通和左侧列表逐条出现
+- 第 `5` 页：异常 `paragraph margin` 把章节列表顶出文本框
+- 第 `7` 页：深色模板下亮色标题 + 黑色正文混排，锁正文颜色矫正

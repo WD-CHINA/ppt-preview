@@ -127,6 +127,77 @@ export interface NormalizedTableMeta {
   cells: NormalizedTableCell[][]
 }
 
+export interface NormalizedChartLegend {
+  position?: string
+  overlay?: boolean
+}
+
+export interface NormalizedChartPoint {
+  category?: string
+  x?: string | number
+  y?: number
+}
+
+export interface NormalizedChartSeries {
+  key: string
+  name: string
+  index?: string
+  order?: string
+  values: number[]
+  points: NormalizedChartPoint[]
+  color?: string
+}
+
+export interface NormalizedChartAxis {
+  id?: string
+  title?: string
+  orientation?: string
+  reverseOrder?: boolean
+  position?: string
+  crosses?: string
+  majorGridlines?: boolean
+  minorGridlines?: boolean
+}
+
+export interface NormalizedChartDataLabels {
+  position?: string
+  showValue?: boolean
+  showCategoryName?: boolean
+}
+
+export interface NormalizedChartMeta {
+  chartType?: string
+  title?: string
+  mode?: string
+  categories: string[]
+  legend?: NormalizedChartLegend
+  series: NormalizedChartSeries[]
+  colors: string[]
+  barDirection?: string
+  grouping?: string
+  stacked?: boolean
+  percentStacked?: boolean
+  dataLabels?: NormalizedChartDataLabels
+  categoryAxis?: NormalizedChartAxis
+  valueAxis?: NormalizedChartAxis
+}
+
+export interface NormalizedDiagramMeta {
+  tree: NormalizedDiagramTreeNode[]
+  layoutKind?: string
+  textList: string[]
+  nodeCount: number
+  relationCount: number
+  drawingTargetNames: string[]
+}
+
+export interface NormalizedDiagramTreeNode {
+  id?: string
+  type?: string
+  text?: string
+  children: NormalizedDiagramTreeNode[]
+}
+
 export interface NormalizedElement {
   id: string
   type: NormalizedElementType
@@ -139,6 +210,8 @@ export interface NormalizedElement {
   media?: MediaResource
   shape?: NormalizedShapeMeta
   table?: NormalizedTableMeta
+  chart?: NormalizedChartMeta
+  diagram?: NormalizedDiagramMeta
   children?: NormalizedElement[]
   raw: unknown
 }
@@ -223,6 +296,8 @@ export interface EvaluatedElementFrame {
   animationGeometry?: EvaluatedAnimationGeometry
   shape?: NormalizedShapeMeta
   table?: NormalizedTableMeta
+  chart?: NormalizedChartMeta
+  diagram?: NormalizedDiagramMeta
   children?: EvaluatedElementFrame[]
 }
 

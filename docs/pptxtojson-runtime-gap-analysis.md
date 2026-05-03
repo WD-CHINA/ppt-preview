@@ -8,7 +8,7 @@
 - 当前最大差距不在上传/解析/基础播放，而在：
   - Runtime engine 还没有拆分
   - Timeline / Transition / Media 还没有形成独立系统
-  - table / chart / diagram 等复杂元素仍未渲染
+  - chart / diagram 这类复杂元素仍只有 first-pass 语义渲染，离高保真还有明显差距
   - 测试、fixture、视觉回归体系仍然缺失
 
 ---
@@ -344,16 +344,16 @@ Presentation Runtime Facade
 类型层已经声明了：
 
 - `table`（已有首批基础 renderer）
-- `chart`
-- `diagram`
+- `chart`（首批 geometry-aware renderer 已落地：当前已覆盖 `bar / pie / scatter / line / area` 的 first-pass 视图）
+- `diagram`（首批 hierarchy-aware renderer 已落地：标准化 `tree` 并渲染节点/连线，仍未对齐真实 SmartArt 几何）
 
 但当前复杂元素 renderer 仍不完整。
 
 这意味着：
 
 - table 已能渲染基础结构、文本、行列尺寸、cell span、基础 fill/font/border/vAlign，并已过滤 `hMerge / vMerge` continuation cell；fallback border 已按 row/column position 收敛以避免内部双线；基础 typography 已支持 `fontFamily / fontSize / fontItalic / fontUnderline`，且已对小字号 cell 增加首轮 `lineHeight/padding` 补强并把 `overflow-wrap` 从 `anywhere` 收紧为 `break-word`，又对单个长英文标签补了第二轮“缩小字号 + keep-all”策略，并在第三轮把列宽感知（`colWidths + columnIndex + colSpan`）纳入 typography 决策，第四轮开始读取 HTML paragraph 结构，对多段正文走单独的 line-height/padding 策略，第五轮开始读取 run 级 `font-size` 作为 effective font size 参与 typography bucket；已定位真实 table 页进入 fixture 索引，并已完成 `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 5 / 24 / 26 / 31 页、`AI Beatify Slides Example.pptx` 第 4 页、`83f822650ce0499c835780f673faed2b.pptx` 第 4 页的浏览器视觉冒烟验证；当前未见明显结构错位、重复渲染或内部双线，但 typography 仍是主问题，尤其是小字偏小、行高偏紧、英文单词断裂与局部裁切；真实页表明即使补了列宽感知、paragraph-aware 和 run-level font-size 规则，cell 级启发式仍不够，后续需要更完整的 paragraph/run 级策略；还缺完整 Office table theme/style、更完整的 cell padding/line-height/run 级 typography 与真实 PPT 截图回归
-- chart 还没做
-- diagram / SmartArt 类还没做
+- chart 已有首批 geometry-aware renderer，但仍缺更多 chart family、真实刻度策略、label placement 与截图回归
+- diagram / SmartArt 已有首批 hierarchy-aware renderer，但仍缺更完整的 layout family、真实 drawing target 几何与视觉对齐
 
 当前系统对复杂 PPT 的兼容瓶颈，已经明显落到这里。
 
@@ -472,8 +472,7 @@ Presentation Runtime Facade
 仍需补齐：
 
 - `TransitionStage`
-- `MediaRenderer`
-- chart/diagram renderer（`TableRenderer` 首批基础版已完成）
+- chart/diagram 的高保真 renderer（first-pass 已有，仍缺几何/布局精修）
 - overlay layer
 - annotation / laser pointer
 - timeline scrubber
@@ -486,7 +485,7 @@ Presentation Runtime Facade
 
 1. **没有模块化 Runtime engine**
 2. **没有完整 Timeline / Transition / Media 系统**
-3. **复杂元素 renderer 仍不完整（table 首批基础版已完成，chart/diagram 未做）**
+3. **复杂元素 renderer 仍不完整（table 已有多轮补强，chart/diagram 已进 first-pass，但仍未高保真）**
 4. **没有回归测试和视觉基准**
 
 这 4 项决定了项目是否能从“持续 patch 某些 PPT”走向“稳定支持一批 PPT 模板”。
@@ -739,8 +738,8 @@ Presentation Runtime Facade
 建议交付物：
 
 - `TableRenderer`（首批基础版已完成：结构/文本/行列尺寸/基础 cell 样式；第二批已补 `hMerge / vMerge` continuation 过滤与真实 table 页索引；第三批已补 fallback border collapse；第四批已做真实页浏览器冒烟验证；第五批已补基础 typography 字段；第六批已补 `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 26 / 31 页浏览器冒烟验证；第七批已完成剩余真实 table 页验证并补小字号 typography 首轮策略；仍需完整 table theme、cell padding/line-height/run 级 typography 与真实 PPT 截图回归）
-- `ChartRenderer`
-- `DiagramRenderer`
+- `ChartRenderer` 高保真补强
+- `DiagramRenderer` / SmartArt layout 补强
 - 对应 fixture 与回归样例
 
 建议优先顺序：
@@ -752,7 +751,7 @@ Presentation Runtime Facade
 原因：
 
 - `table` 是业务 PPT 中最常见且最容易暴露缺口的复杂元素
-- `chart` 和 `diagram` 适合放在有回归体系之后做
+- `chart` 和 `diagram` 现在已经适合进入“真实 fixture + 高保真补强”阶段，而不是继续停留在占位或纯文档层
 
 这一阶段结束标准：
 

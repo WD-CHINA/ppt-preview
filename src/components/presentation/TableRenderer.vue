@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import type { CSSProperties } from 'vue'
 import type { NormalizedTableMeta } from '../../types/presentation'
 import { getRenderableTableCells, getTableCellStyle, getTableColumnCount, getTableGridTemplate } from './tableModel'
+import { sanitizePresentationHtml } from './textHtmlSanitizer'
 
 const props = defineProps<{
   table: NormalizedTableMeta
@@ -18,11 +19,13 @@ const tableStyle = computed<CSSProperties>(() => ({
 const renderableCells = computed(() => getRenderableTableCells(props.table))
 
 function sanitizeTableCellHtml(html: string) {
+  const sanitizedPresentationHtml = sanitizePresentationHtml(html)
+
   if (typeof DOMParser === 'undefined') {
-    return html
+    return sanitizedPresentationHtml
   }
 
-  const documentNode = new DOMParser().parseFromString(html, 'text/html')
+  const documentNode = new DOMParser().parseFromString(sanitizedPresentationHtml, 'text/html')
   documentNode.querySelectorAll('script, style, iframe, object, embed').forEach((node) => node.remove())
 
   for (const element of documentNode.querySelectorAll('*')) {

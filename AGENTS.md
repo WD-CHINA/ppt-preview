@@ -53,6 +53,23 @@ PPTX File
 - `docs/` 用于维护跨文件才能理解的长期设计、路线图和架构说明；当实现改变了 runtime 分层、parser 增强路线或已知差距时，同步更新对应文档。
 - 文档落点优先级：可复现输入和回归证据放 `fixtures/`，问题归因和修复 playbook 放 `knowledge-base/`，系统设计与演进决策放 `docs/`。
 
+## 浏览器视觉基线规范
+
+- 浏览器视觉基线是项目正式资产，不是临时截图；统一规范见 [docs/browser-visual-baseline-spec.md](/Applications/work/ppt-preview/docs/browser-visual-baseline-spec.md)。
+- 处理视觉问题时，优先按以下顺序读取上下文：
+  1. [fixtures/visual-baselines/README.md](/Applications/work/ppt-preview/fixtures/visual-baselines/README.md)
+  2. [fixtures/visual-baselines/public-ppt-fixture-registry.json](/Applications/work/ppt-preview/fixtures/visual-baselines/public-ppt-fixture-registry.json)
+  3. 对应专项 manifest，例如 [fixtures/visual-baselines/transition-visual-baselines.json](/Applications/work/ppt-preview/fixtures/visual-baselines/transition-visual-baselines.json)
+  4. 对应 PNG
+  5. [fixtures/catalog.md](/Applications/work/ppt-preview/fixtures/catalog.md)
+- 如果改动影响了视觉输出，不仅要更新测试，也要判断是否需要更新：
+  - `fixtures/visual-baselines/public-ppt-fixture-registry.json`
+  - manifest
+  - PNG
+  - `fixtures/visual-baselines/README.md`
+  - `fixtures/catalog.md`
+- 只有单测、没有视觉基线说明的高风险渲染修复，不算完整收口。
+
 ## 测试约定
 
 测试使用 Vitest，测试文件与实现文件 colocate，命名为 `*.test.ts`。常见覆盖范围包括：

@@ -220,11 +220,37 @@ export function usePresentationPlayer() {
     await prepareTransitionCase(caseConfig)
   }
 
+  async function prepareStaticSlideByIndex(slideIndex: number) {
+    const activeRuntime = runtime.value
+    const maxSlideIndex = Math.max(activeRuntime.model.slides.length - 1, 0)
+    const clampedIndex = Math.min(Math.max(slideIndex, 0), maxSlideIndex)
+
+    activeRuntime.pause()
+
+    const state = activeRuntime.state
+    state.activeSlideIndex = clampedIndex
+    state.timelinePositionMs = 0
+    state.slideElapsedMs = 0
+    state.currentTriggerIndex = 0
+    state.waitingTrigger = false
+    state.transitionFromSlideIndex = null
+    state.transitionToSlideIndex = null
+    state.transitionProgress = 1
+    state.sessionStatus = 'ready'
+    await nextTick()
+  }
+
+  async function prepareStaticSlideByOneBasedNumber(slideNumber: number) {
+    await prepareStaticSlideByIndex(slideNumber - 1)
+  }
+
   async function loadFixtureFromLocation() {
     const params = new URLSearchParams(window.location.search)
     const transitionCaseId = params.get('transitionCase') ?? params.get('caseId')
     const transitionCase = transitionCaseId ? findTransitionDebugCase(transitionCaseId) : undefined
     const fixtureName = params.get('fixture') ?? transitionCase?.fileName
+    const slideNumber = Number.parseInt(params.get('slide') ?? params.get('page') ?? '', 10)
+    const hasSlideNumber = Number.isFinite(slideNumber) && slideNumber > 0
 
     if (!fixtureName && !transitionCase) {
       return
@@ -237,6 +263,8 @@ export function usePresentationPlayer() {
 
       if (transitionCase) {
         await prepareTransitionCase(transitionCase)
+      } else if (hasSlideNumber) {
+        await prepareStaticSlideByOneBasedNumber(slideNumber)
       }
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : 'Fixture 加载失败'
@@ -248,6 +276,7 @@ export function usePresentationPlayer() {
     startLoop()
     window.__pptPreviewLoadFixture = loadFixtureByName
     window.__pptPreviewPrepareTransitionCase = prepareTransitionCaseById
+    window.__pptPreviewGoToSlide = prepareStaticSlideByOneBasedNumber
     window.__pptPreviewTransitionCases = transitionDebugCases
     void loadFixtureFromLocation()
   })
@@ -257,6 +286,7 @@ export function usePresentationPlayer() {
     runtime.value.dispose()
     delete window.__pptPreviewLoadFixture
     delete window.__pptPreviewPrepareTransitionCase
+    delete window.__pptPreviewGoToSlide
     delete window.__pptPreviewTransitionCases
   })
 

@@ -125,6 +125,10 @@ export interface RawPptxAnimation {
   targetElementIds?: Array<string | number>
   targetElementId?: string | number
   targetParagraphIndex?: number
+  targetCharacterRange?: {
+    start: number
+    end: number
+  }
   motionPath?: RawMotionPath
 }
 

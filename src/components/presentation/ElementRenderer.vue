@@ -4,22 +4,49 @@ import type { CSSProperties } from 'vue'
 import type { EvaluatedElementFrame, NormalizedElement } from '../../types/presentation'
 import TableRenderer from './TableRenderer.vue'
 import MediaRenderer from './MediaRenderer.vue'
+import ChartRenderer from './ChartRenderer.vue'
+import DiagramRenderer from './DiagramRenderer.vue'
 import { createLineMarkerModel } from './lineMarkerModel'
+import { getShapeSvgLayoutModel } from './shapeSvgLayout'
 import { getShapeSvgPaintModel } from './shapeSvgModel'
+import { sanitizePresentationHtml } from './textHtmlSanitizer'
 
 const props = defineProps<{
   element: EvaluatedElementFrame
 }>()
 
+const shapePaintModel = computed(() =>
+  getShapeSvgPaintModel({
+    shapeType: props.element.shape?.type,
+    background: props.element.style.background,
+    border: props.element.style.border,
+  }),
+)
+
+const shapeStrokeWidth = computed(() => shapePaintModel.value.strokeWidth)
+
+const shapeLayoutModel = computed(() =>
+  getShapeSvgLayoutModel({
+    shapeType: props.element.shape?.type,
+    boundsWidth: props.element.bounds.width,
+    boundsHeight: props.element.bounds.height,
+    viewBoxWidth: props.element.shape?.viewBoxWidth,
+    viewBoxHeight: props.element.shape?.viewBoxHeight,
+    strokeWidth: shapeStrokeWidth.value,
+    isFlipH: props.element.shape?.isFlipH,
+    isFlipV: props.element.shape?.isFlipV,
+  }),
+)
+
 const elementStyle = computed<CSSProperties>(() => {
-  const hasText = Boolean(props.element.html || props.element.text)
+  const hasText = Boolean(props.element.renderedHtml || props.element.html || props.element.text)
   const shapeVisualStyle = props.element.type === 'shape'
 
   return {
-    left: `${props.element.bounds.x}px`,
-    top: `${props.element.bounds.y}px`,
-    width: `${props.element.bounds.width}px`,
-    height: `${props.element.bounds.height}px`,
+    left: `${props.element.bounds.x + shapeLayoutModel.value.offsetX}px`,
+    top: `${props.element.bounds.y + shapeLayoutModel.value.offsetY}px`,
+    width: `${shapeLayoutModel.value.renderWidth}px`,
+    height: `${shapeLayoutModel.value.renderHeight}px`,
     transform: `rotate(${props.element.bounds.rotate}deg)`,
     opacity: props.element.opacity,
     display: props.element.visible ? 'block' : 'none',
@@ -33,8 +60,17 @@ const elementStyle = computed<CSSProperties>(() => {
   }
 })
 
-const sanitizedHtml = computed(() => sanitizePresentationHtml(props.element.html))
-const resolvedHtml = computed(() => props.element.renderedHtml ?? sanitizedHtml.value ?? props.element.text ?? '')
+const sanitizedHtml = computed(() => (
+  typeof props.element.html === 'string'
+    ? sanitizePresentationHtml(props.element.html)
+    : undefined
+))
+const sanitizedRenderedHtml = computed(() => (
+  typeof props.element.renderedHtml === 'string'
+    ? sanitizePresentationHtml(props.element.renderedHtml)
+    : undefined
+))
+const resolvedHtml = computed(() => sanitizedRenderedHtml.value ?? sanitizedHtml.value ?? props.element.text ?? '')
 
 const textClass = computed(() => ({
   'element-text': true,
@@ -47,27 +83,19 @@ const textClass = computed(() => ({
 }))
 
 const childElements = computed(() => props.element.children ?? [])
+const chartMeta = computed(() => props.element.chart)
+const diagramMeta = computed(() => props.element.diagram)
 
-const hasTextContent = computed(() => Boolean(props.element.html || props.element.text))
+const hasTextContent = computed(() => Boolean(props.element.renderedHtml || props.element.html || props.element.text))
 
 const shouldRenderText = computed(() => props.element.type === 'text' || hasTextContent.value)
 
 const shapePath = computed(() => props.element.shape?.path)
 const shouldRenderShapeSvg = computed(() => shouldRenderSvgShape(props.element) && Boolean(shapePath.value))
 
-const shapePaintModel = computed(() =>
-  getShapeSvgPaintModel({
-    shapeType: props.element.shape?.type,
-    background: props.element.style.background,
-    border: props.element.style.border,
-  }),
-)
-
 const shapeFill = computed(() => shapePaintModel.value.fill)
 
 const shapeStroke = computed(() => shapePaintModel.value.stroke)
-
-const shapeStrokeWidth = computed(() => shapePaintModel.value.strokeWidth)
 
 const shapeStrokeDasharray = computed(() => props.element.style['--ppt-stroke-dasharray'])
 
@@ -93,25 +121,11 @@ const shapeMarkerEnd = computed(() => {
 
 const shapeMarkerEndModel = computed(() => createLineMarkerModel(props.element.shape?.lineTailEnd, 'end'))
 
-const shapePathTransform = computed(() => {
-  const width = props.element.shape?.viewBoxWidth ?? props.element.bounds.width
-  const height = props.element.shape?.viewBoxHeight ?? props.element.bounds.height
-  const transforms: string[] = []
-
-  if (props.element.shape?.isFlipH) {
-    transforms.push(`translate(${width} 0) scale(-1 1)`)
-  }
-
-  if (props.element.shape?.isFlipV) {
-    transforms.push(`translate(0 ${height}) scale(1 -1)`)
-  }
-
-  return transforms.join(' ')
-})
+const shapePathTransform = computed(() => shapeLayoutModel.value.pathTransform)
 
 const shapeViewBox = computed(() => {
-  const width = props.element.shape?.viewBoxWidth ?? props.element.bounds.width
-  const height = props.element.shape?.viewBoxHeight ?? props.element.bounds.height
+  const width = shapeLayoutModel.value.viewBoxWidth
+  const height = shapeLayoutModel.value.viewBoxHeight
   return `0 0 ${width} ${height}`
 })
 
@@ -183,6 +197,7 @@ const shouldRenderPlaceholder = computed(() => {
 
   return !shouldRenderText.value
 })
+
 </script>
 
 <template>
@@ -242,6 +257,17 @@ const shouldRenderPlaceholder = computed(() => {
     <TableRenderer
       v-else-if="props.element.type === 'table' && props.element.table"
       :table="props.element.table"
+    />
+
+    <ChartRenderer
+      v-else-if="props.element.type === 'chart' && chartMeta"
+      :chart="chartMeta"
+    />
+
+    <DiagramRenderer
+      v-else-if="props.element.type === 'diagram' && diagramMeta"
+      :diagram="diagramMeta"
+      :name="props.element.name"
     />
 
     <template v-else-if="props.element.type === 'group' && childElements.length">
@@ -361,36 +387,6 @@ const shouldRenderPlaceholder = computed(() => {
 </style>
 
 <script lang="ts">
-function sanitizePresentationHtml(html?: string) {
-  if (!html || typeof DOMParser === 'undefined') {
-    return ''
-  }
-
-  const parser = new DOMParser()
-  const documentNode = parser.parseFromString(html, 'text/html')
-
-  documentNode.querySelectorAll('script, style, iframe, object, embed').forEach((node) => node.remove())
-  documentNode.querySelectorAll('li').forEach((node) => {
-    if (isBlankListItem(node)) {
-      node.remove()
-    }
-  })
-
-  for (const element of documentNode.querySelectorAll('*')) {
-    for (const attribute of Array.from(element.attributes)) {
-      const name = attribute.name.toLowerCase()
-
-      if (name.startsWith('on')) {
-        element.removeAttribute(attribute.name)
-      }
-    }
-  }
-
-  normalizeTextWhitespace(documentNode.body)
-
-  return documentNode.body.innerHTML
-}
-
 function mapVerticalAlign(vAlign?: string) {
   switch (vAlign) {
     case 'mid':
@@ -413,33 +409,6 @@ function formatTextInset(inset?: { left: number; right: number; top: number; bot
     paddingRight: `${inset.right}px`,
     paddingTop: `${inset.top}px`,
     paddingBottom: `${inset.bottom}px`,
-  }
-}
-
-function isBlankListItem(node: Element) {
-  const clone = node.cloneNode(true)
-
-  if (clone instanceof Element) {
-    clone.querySelectorAll('.ppt-bullet-marker').forEach((marker) => marker.remove())
-  }
-
-  const text = (clone.textContent ?? '').replace(/[\s\u00a0\u200b-\u200d\ufeff]/g, '')
-  return text.length === 0
-}
-
-function normalizeTextWhitespace(root: ParentNode) {
-  const documentNode = root.ownerDocument
-
-  if (!documentNode) {
-    return
-  }
-
-  const walker = documentNode.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-  let currentNode = walker.nextNode()
-
-  while (currentNode) {
-    currentNode.textContent = (currentNode.textContent ?? '').replace(/[\u00a0\u202f]/g, ' ')
-    currentNode = walker.nextNode()
   }
 }
 
@@ -568,4 +537,5 @@ function shouldRenderSvgShape(element: EvaluatedElementFrame) {
 
   return element.shape.type !== 'rect' && element.shape.type !== 'roundRect'
 }
+
 </script>

@@ -15,7 +15,9 @@
 表格类问题同时维护 [table-regression-cases.md](./table-regression-cases.md)：用合成测试锁住 `NormalizedTableMeta` 与 renderer helper 行为，用真实 PPTX 页面索引推进视觉回归。
 
 转场类真实视觉回归维护在 [transition-regression-cases.md](./transition-regression-cases.md)：记录固定 `transitionProgress` 下的真实 PPTX 中间态证据，并配套浏览器可直接 `import('/transition-regression-harness.js')` 的 harness [`public/transition-regression-harness.js`](/Applications/work/ppt-preview/public/transition-regression-harness.js)。当前还补了一份结构化基线 [`transition-regression-baseline.json`](./transition-regression-baseline.json)，先用 `frame + viewport styles` 守住行为，再逐步升级成截图/像素级对照。
-冻结态截图产物和可复用采集脚本维护在 [visual-baselines/](./visual-baselines/README.md)：当前已经覆盖 `push / wipe / cover / uncover / zoom / split`，并提供 `captureTransitionVisualBaselines.mjs` 供 in-app browser 的 `node_repl` 直接复采；本地一致性校验可直接运行 `pnpm test:visual-baselines`。
+冻结态截图产物和可复用采集脚本维护在 [visual-baselines/](./visual-baselines/README.md)：当前已经覆盖 `push / wipe / cover / uncover / zoom / split`，并提供 `captureTransitionVisualBaselines.mjs` 供 in-app browser 的 `node_repl` 直接复采；本地一致性校验可直接运行 `pnpm test:visual-baselines`。此外，`public/` 下全部 PPT 现已统一登记到 [visual-baselines/public-ppt-fixture-registry.json](./visual-baselines/public-ppt-fixture-registry.json)，后续模型可先从这个 registry 判断每份样本当前已有的基线类型与缺口；非转场页面截图基线已登记到 [visual-baselines/public-ppt-page-visual-baselines.json](./visual-baselines/public-ppt-page-visual-baselines.json)，当前已覆盖 `0501.pptx`、`AI.Tech.Agency.Infographics.by.Slidesgo.pptx`、`4b00a85c247c47bdaeb01aeec562c90f.pptx`、`区级平台介绍.pptx` 和 `watercolor.pptx` 的关键问题页。
+浏览器视觉基线已升级为项目规范，后续模型默认应先读取 [docs/browser-visual-baseline-spec.md](/Applications/work/ppt-preview/docs/browser-visual-baseline-spec.md) 再处理 registry / manifest / PNG。
+复杂元素样本维护在 [complex-element-regression-cases.md](./complex-element-regression-cases.md)：当前先补了一份 targeted synthetic fixture [`public/chart-diagram-fixture.pptx`](/Applications/work/ppt-preview/public/chart-diagram-fixture.pptx) 来覆盖 `chart / diagram` 主链路；需要重建时可直接运行 `pnpm generate:complex-fixture`。
 
 ## 使用约定
 

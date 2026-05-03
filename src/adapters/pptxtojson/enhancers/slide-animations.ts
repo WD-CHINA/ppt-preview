@@ -11,7 +11,7 @@ export function extractSlideAnimationMetadata(slideXml: string): RawPptxAnimatio
   const timingAnimations = timingXml ? extractTimingAnimationMetadata(timingXml) : []
   const buildListAnimations = extractBuildListAnimationMetadata(slideXml)
 
-  return dedupeRawAnimations([...timingAnimations, ...buildListAnimations])
+  return dedupeRawAnimations(resolveCharacterRangeParagraphBuilds([...timingAnimations, ...buildListAnimations]))
 }
 
 export function applySlideAnimationMetadata(slide: RawPptxSlide, animations: RawPptxAnimation[]) {
@@ -39,6 +39,7 @@ function extractTimingAnimationMetadata(timingXml: string) {
       }
 
       const paragraphIndex = extractParagraphIndex(innerXml)
+      const characterRange = paragraphIndex == null ? extractCharacterRange(innerXml) : undefined
 
       return [
         {
@@ -48,6 +49,7 @@ function extractTimingAnimationMetadata(timingXml: string) {
           effect: inferAnimationEffect(innerXml),
           targetElementId,
           ...(paragraphIndex != null ? { targetParagraphIndex: paragraphIndex } : {}),
+          ...(characterRange ? { targetCharacterRange: characterRange } : {}),
         } satisfies RawPptxAnimation,
       ]
     })
@@ -74,6 +76,7 @@ function extractBuildListAnimationMetadata(slideXml: string) {
     }
 
     const paragraphIndex = extractParagraphIndex(`${openTag}${innerXml}`)
+    const characterRange = paragraphIndex == null ? extractCharacterRange(`${openTag}${innerXml}`) : undefined
 
     return [
       {
@@ -83,6 +86,7 @@ function extractBuildListAnimationMetadata(slideXml: string) {
         effect: inferAnimationEffect(innerXml),
         targetElementId,
         ...(paragraphIndex != null ? { targetParagraphIndex: paragraphIndex } : {}),
+        ...(characterRange ? { targetCharacterRange: characterRange } : {}),
       } satisfies RawPptxAnimation,
     ]
   })
@@ -101,6 +105,7 @@ function dedupeRawAnimations(animations: RawPptxAnimation[]) {
       targetElementId: animation.targetElementId ?? '',
       targetElementIds: animation.targetElementIds ?? [],
       targetParagraphIndex: animation.targetParagraphIndex ?? '',
+      targetCharacterRange: animation.targetCharacterRange ?? null,
       motionPath: animation.motionPath ?? null,
     })
 
@@ -160,4 +165,57 @@ function inferAnimationEffect(source: string): RawPptxAnimation['effect'] {
 function extractParagraphIndex(source: string) {
   const match = source.match(/<p:pRg\b[^>]*st="(\d+)"/)
   return match?.[1] != null ? Number.parseInt(match[1], 10) : undefined
+}
+
+function extractCharacterRange(source: string) {
+  const match = source.match(/<p:charRg\b[^>]*st="(\d+)"[^>]*end="(\d+)"/)
+
+  if (!match) {
+    return undefined
+  }
+
+  const startText = match[1]
+  const endText = match[2]
+
+  if (!startText || !endText) {
+    return undefined
+  }
+
+  return {
+    start: Number.parseInt(startText, 10),
+    end: Number.parseInt(endText, 10),
+  }
+}
+
+function resolveCharacterRangeParagraphBuilds(animations: RawPptxAnimation[]) {
+  const nextParagraphIndexByTarget = new Map<string, number>()
+
+  return animations.map((animation, index) => {
+    if (
+      animation.trigger !== 'onClick'
+      || animation.targetParagraphIndex != null
+      || !animation.targetCharacterRange
+      || animation.targetElementId == null
+    ) {
+      return animation
+    }
+
+    const targetElementId = String(animation.targetElementId)
+    const hasEarlierWholeReveal = animations.some((candidate, candidateIndex) => (
+      candidateIndex < index
+      && candidate.trigger === 'onClick'
+      && String(candidate.targetElementId ?? '') === targetElementId
+      && candidate.targetParagraphIndex == null
+      && candidate.targetCharacterRange == null
+    ))
+    const startOffset = hasEarlierWholeReveal ? 1 : 0
+    const nextParagraphIndex = nextParagraphIndexByTarget.get(targetElementId) ?? startOffset
+
+    nextParagraphIndexByTarget.set(targetElementId, nextParagraphIndex + 1)
+
+    return {
+      ...animation,
+      targetParagraphIndex: nextParagraphIndex,
+    }
+  })
 }

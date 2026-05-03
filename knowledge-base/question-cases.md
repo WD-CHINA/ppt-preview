@@ -126,6 +126,17 @@
 - 代表案例：
   - `4b00...pptx` 第 4、5 页
 
+### 4.4 connector 线条因为零尺寸 bounds 完全不显示
+
+- 状态：`resolved`
+- 典型现象：
+  - 明明 parser 已经给出了 `straightConnector1` path
+  - 但浏览器里横线或竖线整段消失
+- 代表案例：
+  - `AI.Tech.Agency.Infographics.by.Slidesgo.pptx` 第 4 页
+- 根因方向：
+  - `width=0` 或 `height=0` 的 connector 被直接渲染成 `0px` SVG 容器
+
 ## 5. Shape 边框、阴影与背景层
 
 ### 5.1 圆角边框只显示局部
@@ -376,5 +387,81 @@
   - `input-engine`
   - `keyboard-shortcuts`
   - `touch-swipe`
-  - `media-sync`
+- `media-sync`
+- `timing`
+
+### 11.2 真实 PPT 文本内容都在，但被异常 paragraph margin 顶出文本框
+
+- 状态：`fixed`
+- 典型现象：
+  - `0501.pptx` 第 `5` 页只剩页头，章节列表大段缺失，看起来像“文本没解析出来”
+  - 实际 `parseWithPptxtojson -> normalizePresentation` 已经拿到完整 HTML，问题发生在 renderer 消费阶段
+- 根因特征：
+  - raw/normalized `html` 中的 `<p>` 内联样式带有 `margin-top: 20em`、`margin-bottom: 0em`
+  - 这类样式在浏览器 DOM 里会把段落整体推出 PPT 文本框可视区域
+  - 同时 `margin-left / text-indent` 仍然是有效的项目符号/缩进语义，不能粗暴清空全部段落样式
+- 已覆盖基线：
+  - `textHtmlSanitizer.ts` 现会移除 block-level `margin-top / margin-bottom`，但保留 `margin-left / text-indent / color`
+  - 无 `DOMParser` 环境下也有 fallback，避免 Vitest/Node 环境把 sanitizer 直接退化成空串
+  - `0501.pptx` 第 `5` 页已补 fixture regression，锁住“原始 HTML 含异常 margin，但 sanitizing 后章节正文仍可见”
+- 代表测试：
+  - `src/components/presentation/textHtmlSanitizer.test.ts`
+  - `src/components/presentation/p0501FixtureRegression.test.ts`
+- 关键标签：
+  - `text`
+  - `html-sanitizer`
+  - `paragraph-margin`
+- `real-fixture`
+- `0501`
+
+### 11.3 深色模板里的正文 run 被 parser 解析成黑色，导致浏览器里接近不可读
+
+- 状态：`fixed`
+- 典型现象：
+  - `0501.pptx` 第 `7` 页这类深绿色底图页面里，标题还是亮黄/亮青，但正文段落被渲成黑色或近黑色
+  - 页面不是“没文字”，而是文字颜色过暗，肉眼看起来像缺字或严重发灰
+- 根因特征：
+  - 同一个文本框里混合出现了亮色标题 run（如 `#FFFF00 / #00FFCC / #66FFFF`）和带真实内容的 `#000000` 正文 run
+  - 这通常不是作者真的想做“黑字配深绿底”，更像 parser/vendor 在 placeholder/theme 继承链上把正文默认色塌成了黑色
+  - 与 11.2 不同，这类问题不是 spacing 把内容顶飞，而是颜色语义本身已经偏掉
+- 已覆盖基线：
+  - `textHtmlSanitizer.ts` 已补最小颜色启发式：仅当同一文本框里同时存在亮色标题 run 和带内容的深色正文 run，且没有现成的近白正文 run 时，才把这些可见深色 run 提升为 `#FFFFFF`
+  - `0501.pptx` 第 `7` 页已补 fixture regression，锁住亮色标题保留、正文黑字提升为白字的行为
+- 代表测试：
+  - `src/components/presentation/textHtmlSanitizer.test.ts`
+  - `src/components/presentation/p0501FixtureRegression.test.ts`
+- 关键标签：
+  - `text`
+  - `color`
+  - `theme-inheritance`
+  - `dark-template`
+  - `real-fixture`
+  - `0501`
+
+### 11.4 真实 PPT 点击动画目标用的是 OOXML shape id，但 runtime 元素还在用合成 id
+
+- 状态：`fixed`
+- 典型现象：
+  - `0501.pptx` 第 `2` 页左侧黄框和右侧绿框在浏览器里一上来就全部显示，点击触发节奏和 WPS 不一致
+  - 用户主观感受是“动画线/逐条出现没了”，但 raw slide 里其实已经有 `clickEffect`
+- 根因特征：
+  - `slide2.xml` 的 timing target 用的是真实 `spid="7171" / "7172"`
+  - parser 之前没有把 `cNvPr id` 写回 raw element，normalize 后元素只能退回 `slide-2-element-*` 这类合成 id
+  - 同一页里还存在 `txEl > charRg` 目标；这类动画不是整块 appear，而是更接近“按文本块逐次 reveal”
+- 已覆盖基线：
+  - vendor parser 现已把 `cNvPr id` 贯通到 `shape / connector / pic / group / graphicFrame`
+  - timing parser 现会保留 `charRg`，并把同 target 的字符范围点击动画收敛成可被 runtime 消费的顺序 paragraph build
+  - runtime paragraph build 现可同时裁切 `<p>` 和 `<li>`，并且当元素先有 whole-element click reveal、后有 paragraph build 时，会先显示首条内容再逐步展开
+  - `0501.pptx` 第 `2` 页已补 fixture regression，锁住 `7171 / 7172` 的真实 target id 和点击后逐步显示行为
+- 代表测试：
+  - `src/vendor/pptxtojson/animation.test.ts`
+  - `src/adapters/pptxtojson/enhancers/slide-animations.test.ts`
+  - `src/runtime/timeline/paragraphBuild.test.ts`
+  - `src/components/presentation/p0501FixtureRegression.test.ts`
+- 关键标签：
   - `timing`
+  - `shape-id`
+  - `char-range-build`
+  - `list-build`
+  - `real-fixture`
+  - `0501`
